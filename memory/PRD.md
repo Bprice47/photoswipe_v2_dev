@@ -3,6 +3,7 @@
 **Version:** 1.0  
 **Created:** August 2025  
 **App Name:** PhotoSwipe  
+**Project Name:** photoswipe_emergent (internal reference)  
 **Tagline:** A Tinder-style gallery cleaner  
 **Platforms:** iOS & Android (Flutter / React Native)
 
