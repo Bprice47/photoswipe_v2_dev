@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../config/routes.dart';
+import '../services/storage_service.dart';
+import '../services/permission_service.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/privacy_card.dart';
 import '../widgets/custom_checkbox.dart';
@@ -17,23 +18,33 @@ class WelcomeScreen extends StatefulWidget {
 }
 
 class _WelcomeScreenState extends State<WelcomeScreen> {
+  final _storageService = StorageService.instance;
+  final _permissionService = PermissionService.instance;
+  
   bool _hasAgreed = false;
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _checkIfAlreadyAccepted();
+    _checkInitialState();
   }
 
-  /// Check if user has already accepted terms
-  Future<void> _checkIfAlreadyAccepted() async {
-    final prefs = await SharedPreferences.getInstance();
-    final hasAccepted = prefs.getBool(AppConstants.keyHasAcceptedTerms) ?? false;
+  /// Check if user has already accepted terms and has permission
+  Future<void> _checkInitialState() async {
+    final hasAccepted = await _storageService.hasAcceptedTerms();
     
     if (hasAccepted && mounted) {
-      // Skip to permission screen if already accepted
-      AppRoutes.navigateAndClear(context, AppRoutes.permission);
+      // Check if we already have permission
+      final permState = await _permissionService.checkPermission();
+      
+      if (_permissionService.hasAccess) {
+        // Skip straight to category if everything is set
+        AppRoutes.navigateAndClear(context, AppRoutes.category);
+      } else {
+        // Go to permission screen
+        AppRoutes.navigateAndClear(context, AppRoutes.permission);
+      }
     } else {
       setState(() => _isLoading = false);
     }
@@ -44,8 +55,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     if (!_hasAgreed) return;
 
     // Save acceptance
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(AppConstants.keyHasAcceptedTerms, true);
+    await _storageService.setTermsAccepted(true);
 
     if (mounted) {
       AppRoutes.navigateTo(context, AppRoutes.permission);
