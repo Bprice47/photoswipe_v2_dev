@@ -7,6 +7,7 @@ import 'app.dart';
 import 'providers/photo_provider.dart';
 import 'providers/dumpbox_provider.dart';
 import 'providers/session_provider.dart';
+import 'services/storage_service.dart';
 
 void main() async {
   // Ensure Flutter bindings are initialized
@@ -14,6 +15,9 @@ void main() async {
   
   // Initialize Hive for local storage
   await Hive.initFlutter();
+  
+  // Initialize storage service
+  await StorageService.instance.init();
   
   // Set preferred orientations (portrait only for this app)
   await SystemChrome.setPreferredOrientations([
