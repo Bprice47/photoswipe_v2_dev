@@ -1,4 +1,4 @@
-name: photo_swipe
+name: photoswipe_emergent
 description: A Tinder-style gallery cleaner app. Swipe right to keep, swipe left to delete.
 publish_to: 'none'
 version: 1.0.0+1
