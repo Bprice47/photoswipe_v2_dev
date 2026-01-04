@@ -1,6 +1,9 @@
-# PhotoSwipe - Flutter Project
+# PhotoSwipe (photoswipe_emergent) - Flutter Project
 
 A Tinder-style gallery cleaner app. Swipe right to keep, swipe left to delete.
+
+**Project Name:** `photoswipe_emergent` (internal)  
+**App Display Name:** `PhotoSwipe` (user-facing)
 
 ## Getting Started
 
@@ -17,7 +20,7 @@ A Tinder-style gallery cleaner app. Swipe right to keep, swipe left to delete.
 
 2. Navigate to the project directory:
    ```bash
-   cd photo_swipe
+   cd photoswipe_emergent
    ```
 
 3. Install dependencies:
