@@ -5,6 +5,11 @@ import '../screens/category_screen.dart';
 import '../screens/date_range_screen.dart';
 import '../screens/swipe_screen.dart';
 import '../screens/dumpbox_screen.dart';
+import '../screens/privacy_policy_screen.dart';
+import '../screens/terms_of_service_screen.dart';
+import '../screens/disclaimer_screen.dart';
+import '../screens/about_screen.dart';
+import '../screens/contact_screen.dart';
 
 /// App route names and navigation
 class AppRoutes {
@@ -18,29 +23,52 @@ class AppRoutes {
   static const String swipe = '/swipe';
   static const String dumpbox = '/dumpbox';
 
+  // Legal & Info routes
+  static const String privacyPolicy = '/privacy-policy';
+  static const String termsOfService = '/terms-of-service';
+  static const String disclaimer = '/disclaimer';
+  static const String about = '/about';
+  static const String contact = '/contact';
+
   /// Generate routes based on settings
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
       case welcome:
         return _buildRoute(const WelcomeScreen(), settings);
-      
+
       case permission:
         return _buildRoute(const PermissionScreen(), settings);
-      
+
       case category:
         return _buildRoute(const CategoryScreen(), settings);
-      
+
       case dateRange:
         return _buildRoute(const DateRangeScreen(), settings);
-      
+
       case swipe:
         // Arguments can include filter options
         final args = settings.arguments as Map<String, dynamic>?;
         return _buildRoute(SwipeScreen(filterOptions: args), settings);
-      
+
       case dumpbox:
         return _buildRoute(const DumpBoxScreen(), settings);
-      
+
+      // Legal & Info screens
+      case privacyPolicy:
+        return _buildRoute(const PrivacyPolicyScreen(), settings);
+
+      case termsOfService:
+        return _buildRoute(const TermsOfServiceScreen(), settings);
+
+      case disclaimer:
+        return _buildRoute(const DisclaimerScreen(), settings);
+
+      case about:
+        return _buildRoute(const AboutScreen(), settings);
+
+      case contact:
+        return _buildRoute(const ContactScreen(), settings);
+
       default:
         return _buildRoute(const WelcomeScreen(), settings);
     }
@@ -71,12 +99,14 @@ class AppRoutes {
   }
 
   /// Navigate to a route (replacing current)
-  static void navigateTo(BuildContext context, String routeName, {Object? arguments}) {
+  static void navigateTo(BuildContext context, String routeName,
+      {Object? arguments}) {
     Navigator.pushNamed(context, routeName, arguments: arguments);
   }
 
   /// Navigate and remove all previous routes
-  static void navigateAndClear(BuildContext context, String routeName, {Object? arguments}) {
+  static void navigateAndClear(BuildContext context, String routeName,
+      {Object? arguments}) {
     Navigator.pushNamedAndRemoveUntil(
       context,
       routeName,

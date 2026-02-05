@@ -9,6 +9,7 @@ import '../providers/dumpbox_provider.dart';
 import '../widgets/dumpbox_badge.dart';
 import '../widgets/swipe_card.dart';
 
+/// Screen 5: Swipe Screen - Main Photo Review Interface
 class SwipeScreen extends StatefulWidget {
   final Map<String, dynamic>? filterOptions;
 
@@ -21,7 +22,6 @@ class SwipeScreen extends StatefulWidget {
 class _SwipeScreenState extends State<SwipeScreen> {
   final CardSwiperController _swiperController = CardSwiperController();
   bool _isInitialized = false;
-  bool _canUndo = false;
 
   @override
   void initState() {
@@ -43,6 +43,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
     final photoProvider = Provider.of<PhotoProvider>(context, listen: false);
 
+    // Set filter from arguments
     if (widget.filterOptions != null) {
       final filterType = widget.filterOptions!['filterType'] as FilterType?;
       final startDate = widget.filterOptions!['startDate'] as DateTime?;
@@ -57,6 +58,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
       }
     }
 
+    // Load photos
     await photoProvider.loadPhotos();
   }
 
@@ -73,17 +75,6 @@ class _SwipeScreenState extends State<SwipeScreen> {
     _swiperController.swipe(CardSwiperDirection.right);
   }
 
-  void _onUndo(DumpBoxProvider dumpBoxProvider) {
-    if (_canUndo) {
-      _swiperController.undo();
-      // Remove last photo from dumpbox if it was swiped left
-      if (dumpBoxProvider.photos.isNotEmpty) {
-        final lastPhoto = dumpBoxProvider.photos.last;
-        dumpBoxProvider.removePhoto(lastPhoto.id);
-      }
-    }
-  }
-
   bool _onSwipe(
     int previousIndex,
     int? currentIndex,
@@ -94,21 +85,19 @@ class _SwipeScreenState extends State<SwipeScreen> {
         Provider.of<DumpBoxProvider>(context, listen: false);
 
     if (direction == CardSwiperDirection.left) {
+      // Swiped left - add to dumpbox
       final photo = photoProvider.photos[previousIndex];
       dumpBoxProvider.addPhoto(photo);
     }
+    // Swiped right - keep (do nothing)
 
     photoProvider.nextPhoto();
-    setState(() => _canUndo = true);
     return true;
   }
 
-  bool _onUndo2(
-      int? previousIndex, int currentIndex, CardSwiperDirection direction) {
-    final photoProvider = Provider.of<PhotoProvider>(context, listen: false);
-    photoProvider.undoPhoto();
-    setState(() => _canUndo = photoProvider.currentIndex > 0);
-    return true;
+  void _onUndo(DumpBoxProvider dumpBoxProvider) {
+    _swiperController.undo();
+    dumpBoxProvider.removeLastPhoto();
   }
 
   @override
@@ -126,7 +115,9 @@ class _SwipeScreenState extends State<SwipeScreen> {
             ),
             title: Text(
               AppConstants.appName,
-              style: AppTheme.h3.copyWith(fontWeight: FontWeight.w700),
+              style: AppTheme.h3.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
             centerTitle: true,
             actions: [
@@ -142,15 +133,24 @@ class _SwipeScreenState extends State<SwipeScreen> {
               padding: const EdgeInsets.all(AppTheme.spacingMd),
               child: Column(
                 children: [
+                  // Card Area
                   Expanded(
-                      child: _buildCardArea(photoProvider, dumpBoxProvider)),
+                    child: _buildCardArea(photoProvider, dumpBoxProvider),
+                  ),
+
                   const SizedBox(height: AppTheme.spacingMd),
+
+                  // Remaining Count
                   Text(
                     '${photoProvider.remainingCount} remaining',
                     style: AppTheme.body,
                   ),
+
                   const SizedBox(height: AppTheme.spacingMd),
+
+                  // Action Buttons
                   _buildActionButtons(photoProvider, dumpBoxProvider),
+
                   const SizedBox(height: AppTheme.spacingMd),
                 ],
               ),
@@ -170,8 +170,10 @@ class _SwipeScreenState extends State<SwipeScreen> {
           children: [
             CircularProgressIndicator(color: AppTheme.accentPrimary),
             SizedBox(height: AppTheme.spacingMd),
-            Text('Loading photos...',
-                style: TextStyle(color: AppTheme.textSecondary)),
+            Text(
+              'Loading photos...',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
           ],
         ),
       );
@@ -182,17 +184,27 @@ class _SwipeScreenState extends State<SwipeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline,
-                size: 64, color: AppTheme.deleteColor),
+            const Icon(
+              Icons.error_outline,
+              size: 64,
+              color: AppTheme.deleteColor,
+            ),
             const SizedBox(height: AppTheme.spacingMd),
-            Text('Error loading photos', style: AppTheme.h3),
+            Text(
+              'Error loading photos',
+              style: AppTheme.h3,
+            ),
             const SizedBox(height: AppTheme.spacingSm),
-            Text(photoProvider.errorMessage!,
-                style: AppTheme.caption, textAlign: TextAlign.center),
+            Text(
+              photoProvider.errorMessage!,
+              style: AppTheme.caption,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: AppTheme.spacingLg),
             ElevatedButton(
-                onPressed: () => photoProvider.loadPhotos(),
-                child: const Text('Retry')),
+              onPressed: () => photoProvider.loadPhotos(),
+              child: const Text('Retry'),
+            ),
           ],
         ),
       );
@@ -203,21 +215,32 @@ class _SwipeScreenState extends State<SwipeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.check_circle_outline,
-                size: 80, color: AppTheme.keepColor),
+            const Icon(
+              Icons.check_circle_outline,
+              size: 80,
+              color: AppTheme.keepColor,
+            ),
             const SizedBox(height: AppTheme.spacingMd),
-            Text(AppConstants.emptyStateTitle, style: AppTheme.h2),
+            Text(
+              AppConstants.emptyStateTitle,
+              style: AppTheme.h2,
+            ),
             const SizedBox(height: AppTheme.spacingSm),
-            Text(AppConstants.emptyStateMessage, style: AppTheme.bodySecondary),
+            Text(
+              AppConstants.emptyStateMessage,
+              style: AppTheme.bodySecondary,
+            ),
             const SizedBox(height: AppTheme.spacingLg),
             ElevatedButton(
-                onPressed: () => AppRoutes.goBack(context),
-                child: const Text('Go Back')),
+              onPressed: () => AppRoutes.goBack(context),
+              child: const Text('Go Back'),
+            ),
           ],
         ),
       );
     }
 
+    // Card Swiper
     return CardSwiper(
       controller: _swiperController,
       cardsCount: photoProvider.photos.length,
@@ -225,29 +248,30 @@ class _SwipeScreenState extends State<SwipeScreen> {
       backCardOffset: const Offset(0, 30),
       padding: EdgeInsets.zero,
       onSwipe: _onSwipe,
-      onUndo: _onUndo2,
-      isLoop: false,
-      allowedSwipeDirection:
-          const AllowedSwipeDirection.symmetric(horizontal: true),
+      onUndo: (previousIndex, currentIndex, direction) => true,
+      allowedSwipeDirection: const AllowedSwipeDirection.symmetric(
+        horizontal: true,
+      ),
       cardBuilder: (context, index, percentThresholdX, percentThresholdY) {
         if (index >= photoProvider.photos.length) {
           return const SizedBox.shrink();
         }
 
         final photo = photoProvider.photos[index];
-        final double threshold = percentThresholdX.toDouble();
 
         return Stack(
           fit: StackFit.expand,
           children: [
             SwipeCard(
               photo: photo,
-              onUndo: _canUndo ? () => _onUndo(dumpBoxProvider) : null,
+              onUndo: () => _onUndo(dumpBoxProvider),
             ),
-            if (threshold != 0)
+
+            // Swipe overlay
+            if (percentThresholdX != 0)
               SwipeOverlay(
-                isLeft: threshold < 0,
-                opacity: threshold.abs().clamp(0.0, 1.0),
+                isLeft: percentThresholdX < 0,
+                opacity: percentThresholdX.abs().clamp(0.0, 1.0).toDouble(),
               ),
           ],
         );
@@ -256,11 +280,14 @@ class _SwipeScreenState extends State<SwipeScreen> {
   }
 
   Widget _buildActionButtons(
-      PhotoProvider photoProvider, DumpBoxProvider dumpBoxProvider) {
+    PhotoProvider photoProvider,
+    DumpBoxProvider dumpBoxProvider,
+  ) {
     final hasPhotos = photoProvider.hasPhotos;
 
     return Row(
       children: [
+        // Delete Button
         Expanded(
           child: SizedBox(
             height: 56,
@@ -274,7 +301,8 @@ class _SwipeScreenState extends State<SwipeScreen> {
                     : AppTheme.backgroundCardAlt,
                 foregroundColor: AppTheme.textPrimary,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppTheme.radiusPill)),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+                ),
                 elevation: 0,
               ),
               child: Row(
@@ -282,13 +310,19 @@ class _SwipeScreenState extends State<SwipeScreen> {
                 children: [
                   const Icon(Icons.arrow_back),
                   const SizedBox(width: AppTheme.spacingSm),
-                  Text(AppConstants.buttonDelete, style: AppTheme.button),
+                  Text(
+                    AppConstants.buttonDelete,
+                    style: AppTheme.button,
+                  ),
                 ],
               ),
             ),
           ),
         ),
+
         const SizedBox(width: AppTheme.spacingMd),
+
+        // Keep Button
         Expanded(
           child: SizedBox(
             height: 56,
@@ -299,13 +333,17 @@ class _SwipeScreenState extends State<SwipeScreen> {
                     hasPhotos ? AppTheme.keepColor : AppTheme.backgroundCardAlt,
                 foregroundColor: AppTheme.textPrimary,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppTheme.radiusPill)),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+                ),
                 elevation: 0,
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(AppConstants.buttonKeep, style: AppTheme.button),
+                  Text(
+                    AppConstants.buttonKeep,
+                    style: AppTheme.button,
+                  ),
                   const SizedBox(width: AppTheme.spacingSm),
                   const Icon(Icons.arrow_forward),
                 ],

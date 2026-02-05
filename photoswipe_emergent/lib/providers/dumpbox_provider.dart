@@ -30,6 +30,15 @@ class DumpBoxProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Remove the last added photo (for Undo functionality)
+  void removeLastPhoto() {
+    if (_dumpBoxPhotos.isNotEmpty) {
+      final lastPhoto = _dumpBoxPhotos.removeLast();
+      _selectedIds.remove(lastPhoto.id);
+      notifyListeners();
+    }
+  }
+
   /// Toggle selection of a photo
   void toggleSelection(String photoId) {
     if (_selectedIds.contains(photoId)) {

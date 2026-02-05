@@ -3,6 +3,7 @@ import '../config/theme.dart';
 import '../config/constants.dart';
 import '../config/routes.dart';
 import '../widgets/category_tile.dart';
+import '../widgets/app_drawer.dart';
 
 /// Screen 3: Category Screen - Main Menu
 /// Let user choose how they want to review photos
@@ -13,11 +14,17 @@ class CategoryScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundMain,
+      drawer: const AppDrawer(),
       appBar: AppBar(
         backgroundColor: AppTheme.backgroundMain,
         elevation: 0,
         centerTitle: true,
-        automaticallyImplyLeading: false,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
         title: Text(
           'Select Category',
           style: AppTheme.headerTitle,
@@ -32,7 +39,7 @@ class CategoryScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: AppTheme.spacingLg),
-              
+
               // Question
               Padding(
                 padding: const EdgeInsets.symmetric(
@@ -43,9 +50,9 @@ class CategoryScreen extends StatelessWidget {
                   style: AppTheme.h2,
                 ),
               ),
-              
+
               const SizedBox(height: AppTheme.spacingLg),
-              
+
               // Category Options
               Expanded(
                 child: ListView(
@@ -61,7 +68,7 @@ class CategoryScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: AppTheme.spacingMd),
-                    
+
                     // Oldest
                     CategoryTile(
                       icon: Icons.history,
@@ -73,7 +80,7 @@ class CategoryScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: AppTheme.spacingMd),
-                    
+
                     // Videos
                     CategoryTile(
                       icon: Icons.videocam,
@@ -85,7 +92,7 @@ class CategoryScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: AppTheme.spacingMd),
-                    
+
                     // Custom Date Range
                     CategoryTile(
                       icon: Icons.calendar_month,
@@ -97,7 +104,7 @@ class CategoryScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: AppTheme.spacingMd),
-                    
+
                     // Resume Last Session
                     CategoryTile(
                       icon: Icons.play_circle_outline,
