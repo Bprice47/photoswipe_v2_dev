@@ -43,6 +43,9 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
     final photoProvider = Provider.of<PhotoProvider>(context, listen: false);
 
+    // Initialize provider (load reviewed IDs)
+    await photoProvider.init();
+
     // Set filter from arguments
     if (widget.filterOptions != null) {
       final filterType = widget.filterOptions!['filterType'] as FilterType?;
@@ -71,7 +74,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
     _swiperController.swipe(CardSwiperDirection.left);
   }
 
-  void _onSwipeRight() {
+  void _onSwipeRight(PhotoProvider photoProvider) {
     _swiperController.swipe(CardSwiperDirection.right);
   }
 
@@ -85,13 +88,15 @@ class _SwipeScreenState extends State<SwipeScreen> {
         Provider.of<DumpBoxProvider>(context, listen: false);
 
     if (direction == CardSwiperDirection.left) {
-      // Swiped left - add to dumpbox
+      // Swiped left - add to dumpbox (not marked as reviewed)
       final photo = photoProvider.photos[previousIndex];
       dumpBoxProvider.addPhoto(photo);
+      photoProvider.swipeLeft();
+    } else if (direction == CardSwiperDirection.right) {
+      // Swiped right - keep photo and mark as reviewed
+      photoProvider.swipeRight();
     }
-    // Swiped right - keep (do nothing)
 
-    photoProvider.nextPhoto();
     return true;
   }
 
@@ -140,9 +145,9 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
                   const SizedBox(height: AppTheme.spacingMd),
 
-                  // Remaining Count
+                  // Remaining Count + Total
                   Text(
-                    '${photoProvider.remainingCount} remaining',
+                    '${photoProvider.remainingCount} remaining (${photoProvider.photos.length} loaded)',
                     style: AppTheme.body,
                   ),
 
@@ -327,7 +332,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
           child: SizedBox(
             height: 56,
             child: ElevatedButton(
-              onPressed: hasPhotos ? _onSwipeRight : null,
+              onPressed: hasPhotos ? () => _onSwipeRight(photoProvider) : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor:
                     hasPhotos ? AppTheme.keepColor : AppTheme.backgroundCardAlt,

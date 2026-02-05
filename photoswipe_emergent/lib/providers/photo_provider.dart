@@ -1,11 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/photo_model.dart';
 import '../config/constants.dart';
 
 /// Provider for managing the photo list and swipe state
 class PhotoProvider extends ChangeNotifier {
   List<PhotoModel> _photos = [];
+  List<AssetEntity> _allAssets = [];
   int _currentIndex = 0;
   bool _isLoading = false;
   String? _errorMessage;
@@ -13,6 +15,7 @@ class PhotoProvider extends ChangeNotifier {
   DateTime? _startDate;
   DateTime? _endDate;
   int _totalCount = 0;
+  Set<String> _reviewedPhotoIds = {};
 
   // Getters
   List<PhotoModel> get photos => _photos;
@@ -22,9 +25,46 @@ class PhotoProvider extends ChangeNotifier {
   FilterType get currentFilter => _currentFilter;
   int get remainingCount => _photos.length - _currentIndex;
   int get totalCount => _totalCount;
+  Set<String> get reviewedPhotoIds => _reviewedPhotoIds;
   PhotoModel? get currentPhoto =>
       _currentIndex < _photos.length ? _photos[_currentIndex] : null;
   bool get hasPhotos => _photos.isNotEmpty && _currentIndex < _photos.length;
+
+  /// Initialize - load reviewed photo IDs from storage
+  Future<void> init() async {
+    await _loadReviewedIds();
+  }
+
+  /// Load reviewed photo IDs from storage
+  Future<void> _loadReviewedIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final ids = prefs.getStringList(AppConstants.keyReviewedPhotoIds) ?? [];
+      _reviewedPhotoIds = ids.toSet();
+      debugPrint('Loaded ${_reviewedPhotoIds.length} reviewed photo IDs');
+    } catch (e) {
+      debugPrint('Error loading reviewed IDs: $e');
+    }
+  }
+
+  /// Save reviewed photo IDs to storage
+  Future<void> _saveReviewedIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(
+        AppConstants.keyReviewedPhotoIds,
+        _reviewedPhotoIds.toList(),
+      );
+    } catch (e) {
+      debugPrint('Error saving reviewed IDs: $e');
+    }
+  }
+
+  /// Mark a photo as reviewed (swiped right = kept)
+  Future<void> markAsReviewed(String photoId) async {
+    _reviewedPhotoIds.add(photoId);
+    await _saveReviewedIds();
+  }
 
   /// Set filter options before loading photos
   void setFilter({
@@ -47,12 +87,17 @@ class PhotoProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Make sure reviewed IDs are loaded
+      if (_reviewedPhotoIds.isEmpty) {
+        await _loadReviewedIds();
+      }
+
       // Get the appropriate request type
       RequestType requestType = RequestType.image;
       if (_currentFilter == FilterType.videos) {
         requestType = RequestType.video;
-      } else if (_currentFilter != FilterType.videos) {
-        requestType = RequestType.common;
+      } else {
+        requestType = RequestType.common; // Both images and videos
       }
 
       // Get all albums
@@ -68,20 +113,32 @@ class PhotoProvider extends ChangeNotifier {
         return;
       }
 
-      // Get the "Recent" album (usually first)
+      // Get the "Recent" album (usually first, contains all)
       final AssetPathEntity recentAlbum = albums.first;
       _totalCount = await recentAlbum.assetCountAsync;
 
-      // Fetch photos
-      final List<AssetEntity> assets = await recentAlbum.getAssetListPaged(
-        page: 0,
-        size: AppConstants.maxInitialPhotos,
+      debugPrint('Total photos in library: $_totalCount');
+
+      // Fetch ALL photo references (fast - no thumbnails yet)
+      _allAssets = await recentAlbum.getAssetListRange(
+        start: 0,
+        end: _totalCount,
       );
 
-      // Convert to PhotoModel and load HIGH QUALITY thumbnails
-      List<PhotoModel> loadedPhotos = [];
+      debugPrint('Fetched ${_allAssets.length} asset references');
 
-      for (final asset in assets) {
+      // Sort based on filter type FIRST
+      if (_currentFilter == FilterType.oldest) {
+        _allAssets.sort((a, b) => a.createDateTime.compareTo(b.createDateTime));
+      } else {
+        // Most recent (default)
+        _allAssets.sort((a, b) => b.createDateTime.compareTo(a.createDateTime));
+      }
+
+      // Filter assets based on criteria
+      List<AssetEntity> filteredAssets = [];
+
+      for (final asset in _allAssets) {
         // Apply date filters if set
         if (_startDate != null && asset.createDateTime.isBefore(_startDate!)) {
           continue;
@@ -90,10 +147,27 @@ class PhotoProvider extends ChangeNotifier {
           continue;
         }
 
-        // Load HIGH QUALITY thumbnail (800x800 instead of 200x200)
+        // For Resume Session: skip already reviewed photos
+        if (_currentFilter == FilterType.resume) {
+          if (_reviewedPhotoIds.contains(asset.id)) {
+            continue;
+          }
+        }
+
+        filteredAssets.add(asset);
+      }
+
+      debugPrint('Filtered to ${filteredAssets.length} assets');
+
+      // Load thumbnails for first batch (for smooth UX)
+      final int initialBatchSize = 10;
+      List<PhotoModel> loadedPhotos = [];
+
+      for (int i = 0; i < filteredAssets.length && i < initialBatchSize; i++) {
+        final asset = filteredAssets[i];
         final thumbnail = await asset.thumbnailDataWithSize(
           const ThumbnailSize(800, 800),
-          quality: 90,
+          quality: 85,
         );
 
         loadedPhotos.add(PhotoModel(
@@ -109,24 +183,58 @@ class PhotoProvider extends ChangeNotifier {
         ));
       }
 
-      // Sort based on filter type
-      if (_currentFilter == FilterType.oldest) {
-        loadedPhotos.sort((a, b) => a.createDate.compareTo(b.createDate));
-      } else {
-        loadedPhotos.sort((a, b) => b.createDate.compareTo(a.createDate));
-      }
-
       _photos = loadedPhotos;
       _isLoading = false;
       notifyListeners();
 
-      debugPrint('Loaded ${_photos.length} photos');
+      debugPrint('Initial batch loaded: ${_photos.length} photos');
+
+      // Load remaining thumbnails in background
+      _loadRemainingPhotos(filteredAssets, initialBatchSize);
     } catch (e) {
       _errorMessage = e.toString();
       _isLoading = false;
       notifyListeners();
       debugPrint('Error loading photos: $e');
     }
+  }
+
+  /// Load remaining photos in background
+  Future<void> _loadRemainingPhotos(
+      List<AssetEntity> assets, int startIndex) async {
+    for (int i = startIndex; i < assets.length; i++) {
+      final asset = assets[i];
+
+      try {
+        final thumbnail = await asset.thumbnailDataWithSize(
+          const ThumbnailSize(800, 800),
+          quality: 85,
+        );
+
+        _photos.add(PhotoModel(
+          id: asset.id,
+          createDate: asset.createDateTime,
+          modifyDate: asset.modifiedDateTime,
+          width: asset.width,
+          height: asset.height,
+          type:
+              asset.type == AssetType.video ? PhotoType.video : PhotoType.image,
+          duration: asset.type == AssetType.video ? asset.duration : null,
+          thumbnail: thumbnail,
+        ));
+
+        // Update UI every 20 photos
+        if (i % 20 == 0) {
+          notifyListeners();
+          debugPrint('Loaded ${_photos.length} photos...');
+        }
+      } catch (e) {
+        debugPrint('Error loading photo $i: $e');
+      }
+    }
+
+    notifyListeners();
+    debugPrint('Finished loading all ${_photos.length} photos');
   }
 
   /// Move to next photo (called after swipe)
@@ -145,11 +253,31 @@ class PhotoProvider extends ChangeNotifier {
     }
   }
 
+  /// Swipe right - keep photo and mark as reviewed
+  Future<void> swipeRight() async {
+    if (currentPhoto != null) {
+      await markAsReviewed(currentPhoto!.id);
+    }
+    nextPhoto();
+  }
+
+  /// Swipe left - goes to dumpbox (don't mark as reviewed)
+  void swipeLeft() {
+    nextPhoto();
+  }
+
   /// Reset to beginning
   void reset() {
     _currentIndex = 0;
     _photos = [];
     _errorMessage = null;
+    notifyListeners();
+  }
+
+  /// Clear all reviewed IDs (for testing/reset)
+  Future<void> clearReviewedIds() async {
+    _reviewedPhotoIds.clear();
+    await _saveReviewedIds();
     notifyListeners();
   }
 
@@ -160,13 +288,5 @@ class PhotoProvider extends ChangeNotifier {
         (_currentIndex + AppConstants.cardsInStack).clamp(0, _photos.length);
     if (_currentIndex >= _photos.length) return [];
     return _photos.sublist(_currentIndex, endIndex);
-  }
-
-  void swipeLeft() {
-    nextPhoto();
-  }
-
-  void swipeRight() {
-    nextPhoto();
   }
 }
