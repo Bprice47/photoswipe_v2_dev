@@ -9,7 +9,6 @@ import '../providers/dumpbox_provider.dart';
 import '../widgets/dumpbox_badge.dart';
 import '../widgets/swipe_card.dart';
 
-/// Screen 5: Swipe Screen - Main Photo Review Interface
 class SwipeScreen extends StatefulWidget {
   final Map<String, dynamic>? filterOptions;
 
@@ -22,6 +21,7 @@ class SwipeScreen extends StatefulWidget {
 class _SwipeScreenState extends State<SwipeScreen> {
   final CardSwiperController _swiperController = CardSwiperController();
   bool _isInitialized = false;
+  bool _canUndo = false;
 
   @override
   void initState() {
@@ -73,6 +73,17 @@ class _SwipeScreenState extends State<SwipeScreen> {
     _swiperController.swipe(CardSwiperDirection.right);
   }
 
+  void _onUndo(DumpBoxProvider dumpBoxProvider) {
+    if (_canUndo) {
+      _swiperController.undo();
+      // Remove last photo from dumpbox if it was swiped left
+      if (dumpBoxProvider.photos.isNotEmpty) {
+        final lastPhoto = dumpBoxProvider.photos.last;
+        dumpBoxProvider.removePhoto(lastPhoto.id);
+      }
+    }
+  }
+
   bool _onSwipe(
     int previousIndex,
     int? currentIndex,
@@ -88,6 +99,15 @@ class _SwipeScreenState extends State<SwipeScreen> {
     }
 
     photoProvider.nextPhoto();
+    setState(() => _canUndo = true);
+    return true;
+  }
+
+  bool _onUndo2(
+      int? previousIndex, int currentIndex, CardSwiperDirection direction) {
+    final photoProvider = Provider.of<PhotoProvider>(context, listen: false);
+    photoProvider.undoPhoto();
+    setState(() => _canUndo = photoProvider.currentIndex > 0);
     return true;
   }
 
@@ -106,9 +126,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
             ),
             title: Text(
               AppConstants.appName,
-              style: AppTheme.h3.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+              style: AppTheme.h3.copyWith(fontWeight: FontWeight.w700),
             ),
             centerTitle: true,
             actions: [
@@ -125,8 +143,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
               child: Column(
                 children: [
                   Expanded(
-                    child: _buildCardArea(photoProvider),
-                  ),
+                      child: _buildCardArea(photoProvider, dumpBoxProvider)),
                   const SizedBox(height: AppTheme.spacingMd),
                   Text(
                     '${photoProvider.remainingCount} remaining',
@@ -144,7 +161,8 @@ class _SwipeScreenState extends State<SwipeScreen> {
     );
   }
 
-  Widget _buildCardArea(PhotoProvider photoProvider) {
+  Widget _buildCardArea(
+      PhotoProvider photoProvider, DumpBoxProvider dumpBoxProvider) {
     if (photoProvider.isLoading) {
       return const Center(
         child: Column(
@@ -152,10 +170,8 @@ class _SwipeScreenState extends State<SwipeScreen> {
           children: [
             CircularProgressIndicator(color: AppTheme.accentPrimary),
             SizedBox(height: AppTheme.spacingMd),
-            Text(
-              'Loading photos...',
-              style: TextStyle(color: AppTheme.textSecondary),
-            ),
+            Text('Loading photos...',
+                style: TextStyle(color: AppTheme.textSecondary)),
           ],
         ),
       );
@@ -171,16 +187,12 @@ class _SwipeScreenState extends State<SwipeScreen> {
             const SizedBox(height: AppTheme.spacingMd),
             Text('Error loading photos', style: AppTheme.h3),
             const SizedBox(height: AppTheme.spacingSm),
-            Text(
-              photoProvider.errorMessage!,
-              style: AppTheme.caption,
-              textAlign: TextAlign.center,
-            ),
+            Text(photoProvider.errorMessage!,
+                style: AppTheme.caption, textAlign: TextAlign.center),
             const SizedBox(height: AppTheme.spacingLg),
             ElevatedButton(
-              onPressed: () => photoProvider.loadPhotos(),
-              child: const Text('Retry'),
-            ),
+                onPressed: () => photoProvider.loadPhotos(),
+                child: const Text('Retry')),
           ],
         ),
       );
@@ -199,9 +211,8 @@ class _SwipeScreenState extends State<SwipeScreen> {
             Text(AppConstants.emptyStateMessage, style: AppTheme.bodySecondary),
             const SizedBox(height: AppTheme.spacingLg),
             ElevatedButton(
-              onPressed: () => AppRoutes.goBack(context),
-              child: const Text('Go Back'),
-            ),
+                onPressed: () => AppRoutes.goBack(context),
+                child: const Text('Go Back')),
           ],
         ),
       );
@@ -214,7 +225,8 @@ class _SwipeScreenState extends State<SwipeScreen> {
       backCardOffset: const Offset(0, 30),
       padding: EdgeInsets.zero,
       onSwipe: _onSwipe,
-      onUndo: (previousIndex, currentIndex, direction) => false,
+      onUndo: _onUndo2,
+      isLoop: false,
       allowedSwipeDirection:
           const AllowedSwipeDirection.symmetric(horizontal: true),
       cardBuilder: (context, index, percentThresholdX, percentThresholdY) {
@@ -230,7 +242,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
           children: [
             SwipeCard(
               photo: photo,
-              onClose: () => _swiperController.swipe(CardSwiperDirection.left),
+              onUndo: _canUndo ? () => _onUndo(dumpBoxProvider) : null,
             ),
             if (threshold != 0)
               SwipeOverlay(
@@ -244,9 +256,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
   }
 
   Widget _buildActionButtons(
-    PhotoProvider photoProvider,
-    DumpBoxProvider dumpBoxProvider,
-  ) {
+      PhotoProvider photoProvider, DumpBoxProvider dumpBoxProvider) {
     final hasPhotos = photoProvider.hasPhotos;
 
     return Row(
@@ -264,8 +274,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
                     : AppTheme.backgroundCardAlt,
                 foregroundColor: AppTheme.textPrimary,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppTheme.radiusPill),
-                ),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusPill)),
                 elevation: 0,
               ),
               child: Row(
@@ -290,8 +299,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
                     hasPhotos ? AppTheme.keepColor : AppTheme.backgroundCardAlt,
                 foregroundColor: AppTheme.textPrimary,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppTheme.radiusPill),
-                ),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusPill)),
                 elevation: 0,
               ),
               child: Row(

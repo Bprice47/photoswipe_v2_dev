@@ -52,7 +52,7 @@ class PhotoProvider extends ChangeNotifier {
       if (_currentFilter == FilterType.videos) {
         requestType = RequestType.video;
       } else if (_currentFilter != FilterType.videos) {
-        requestType = RequestType.common; // Both images and videos
+        requestType = RequestType.common;
       }
 
       // Get all albums
@@ -78,7 +78,7 @@ class PhotoProvider extends ChangeNotifier {
         size: AppConstants.maxInitialPhotos,
       );
 
-      // Convert to PhotoModel and load thumbnails
+      // Convert to PhotoModel and load HIGH QUALITY thumbnails
       List<PhotoModel> loadedPhotos = [];
 
       for (final asset in assets) {
@@ -90,13 +90,10 @@ class PhotoProvider extends ChangeNotifier {
           continue;
         }
 
-        // Load thumbnail
+        // Load HIGH QUALITY thumbnail (800x800 instead of 200x200)
         final thumbnail = await asset.thumbnailDataWithSize(
-          const ThumbnailSize(
-            AppConstants.thumbnailSize,
-            AppConstants.thumbnailSize,
-          ),
-          quality: 80,
+          const ThumbnailSize(800, 800),
+          quality: 90,
         );
 
         loadedPhotos.add(PhotoModel(
@@ -116,7 +113,6 @@ class PhotoProvider extends ChangeNotifier {
       if (_currentFilter == FilterType.oldest) {
         loadedPhotos.sort((a, b) => a.createDate.compareTo(b.createDate));
       } else {
-        // Most recent (default)
         loadedPhotos.sort((a, b) => b.createDate.compareTo(a.createDate));
       }
 
@@ -141,6 +137,14 @@ class PhotoProvider extends ChangeNotifier {
     }
   }
 
+  /// Undo - go back to previous photo
+  void undoPhoto() {
+    if (_currentIndex > 0) {
+      _currentIndex--;
+      notifyListeners();
+    }
+  }
+
   /// Reset to beginning
   void reset() {
     _currentIndex = 0;
@@ -158,14 +162,11 @@ class PhotoProvider extends ChangeNotifier {
     return _photos.sublist(_currentIndex, endIndex);
   }
 
-  /// Mark current photo as reviewed and move to next
   void swipeLeft() {
-    // Photo goes to dumpbox - handled by dumpbox_provider
     nextPhoto();
   }
 
   void swipeRight() {
-    // Keep photo - just move to next
     nextPhoto();
   }
 }

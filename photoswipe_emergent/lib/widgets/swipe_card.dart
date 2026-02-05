@@ -5,18 +5,12 @@ import '../models/photo_model.dart';
 /// Swipeable photo card widget
 class SwipeCard extends StatelessWidget {
   final PhotoModel photo;
-  final VoidCallback? onExpand;
-  final VoidCallback? onRotateLeft;
-  final VoidCallback? onRotateRight;
-  final VoidCallback? onClose;
+  final VoidCallback? onUndo;
 
   const SwipeCard({
     super.key,
     required this.photo,
-    this.onExpand,
-    this.onRotateLeft,
-    this.onRotateRight,
-    this.onClose,
+    this.onUndo,
   });
 
   @override
@@ -41,13 +35,47 @@ class SwipeCard extends StatelessWidget {
             // Photo
             _buildPhoto(),
 
-            // Top controls
-            Positioned(
-              top: AppTheme.spacingSm,
-              left: AppTheme.spacingSm,
-              right: AppTheme.spacingSm,
-              child: _buildTopControls(),
-            ),
+            // Undo button - center top
+            if (onUndo != null)
+              Positioned(
+                top: AppTheme.spacingSm,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: GestureDetector(
+                    onTap: onUndo,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppTheme.spacingMd,
+                        vertical: AppTheme.spacingSm,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.6),
+                        borderRadius:
+                            BorderRadius.circular(AppTheme.radiusPill),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.undo,
+                            color: AppTheme.textPrimary,
+                            size: 20,
+                          ),
+                          const SizedBox(width: AppTheme.spacingXs),
+                          Text(
+                            'Undo',
+                            style: AppTheme.caption.copyWith(
+                              color: AppTheme.textPrimary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
 
             // Video indicator
             if (photo.isVideo)
@@ -88,54 +116,6 @@ class SwipeCard extends StatelessWidget {
     );
   }
 
-  Widget _buildTopControls() {
-    return Row(
-      children: [
-        // Rotate left
-        _buildControlButton(
-          icon: Icons.rotate_left,
-          onTap: onRotateLeft,
-        ),
-        const SizedBox(width: AppTheme.spacingSm),
-
-        // Expand
-        _buildControlButton(
-          icon: Icons.fullscreen,
-          onTap: onExpand,
-        ),
-
-        const Spacer(),
-
-        // Close/Skip
-        _buildControlButton(
-          icon: Icons.close,
-          onTap: onClose,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildControlButton({
-    required IconData icon,
-    VoidCallback? onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(AppTheme.spacingSm),
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
-        ),
-        child: Icon(
-          icon,
-          color: AppTheme.textPrimary,
-          size: 24,
-        ),
-      ),
-    );
-  }
-
   Widget _buildVideoIndicator() {
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -169,7 +149,7 @@ class SwipeCard extends StatelessWidget {
 
 /// Swipe overlay indicator (shows DELETE or KEEP)
 class SwipeOverlay extends StatelessWidget {
-  final bool isLeft; // true = delete (red), false = keep (green)
+  final bool isLeft;
   final double opacity;
 
   const SwipeOverlay({

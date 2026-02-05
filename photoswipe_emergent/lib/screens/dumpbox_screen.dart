@@ -5,11 +5,11 @@ import '../config/theme.dart';
 import '../config/constants.dart';
 import '../config/routes.dart';
 import '../providers/dumpbox_provider.dart';
+import '../models/photo_model.dart';
 import '../widgets/confirmation_dialog.dart';
 import '../widgets/custom_checkbox.dart';
 
-/// Screen 6 & 7: DumpBox Screen
-/// Review photos marked for deletion before permanent removal
+/// DumpBox Screen - Review photos before deletion
 class DumpBoxScreen extends StatefulWidget {
   const DumpBoxScreen({super.key});
 
@@ -20,21 +20,16 @@ class DumpBoxScreen extends StatefulWidget {
 class _DumpBoxScreenState extends State<DumpBoxScreen> {
   bool _isDeleting = false;
 
-  /// Actually delete photos from device
   Future<void> _deleteSelectedPhotos(DumpBoxProvider dumpBox) async {
     if (dumpBox.selectedCount == 0) return;
 
     setState(() => _isDeleting = true);
 
     try {
-      // Get IDs of selected photos
       final selectedPhotos = dumpBox.getSelectedPhotos();
       final photoIds = selectedPhotos.map((p) => p.id).toList();
-
-      // Delete using photo_manager (triggers system confirmation on iOS)
       final deletedIds = await PhotoManager.editor.deleteWithIds(photoIds);
 
-      // Remove deleted photos from dumpbox
       for (final id in deletedIds) {
         dumpBox.removePhoto(id);
       }
@@ -61,6 +56,27 @@ class _DumpBoxScreenState extends State<DumpBoxScreen> {
         setState(() => _isDeleting = false);
       }
     }
+  }
+
+  void _showPhotoViewer(
+      BuildContext context, PhotoModel photo, DumpBoxProvider dumpBox) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (context) => _PhotoViewerDialog(
+        photo: photo,
+        onDelete: () {
+          Navigator.pop(context);
+          dumpBox.removePhoto(photo.id);
+          // Actually delete from device
+          PhotoManager.editor.deleteWithIds([photo.id]);
+        },
+        onKeep: () {
+          Navigator.pop(context);
+          dumpBox.removePhoto(photo.id);
+        },
+      ),
+    );
   }
 
   @override
@@ -98,6 +114,16 @@ class _DumpBoxScreenState extends State<DumpBoxScreen> {
           body: SafeArea(
             child: Column(
               children: [
+                // Hint text
+                if (dumpBox.hasPhotos)
+                  Padding(
+                    padding: const EdgeInsets.all(AppTheme.spacingSm),
+                    child: Text(
+                      'Tap photo to view full size',
+                      style: AppTheme.caption,
+                    ),
+                  ),
+
                 // Photo Grid
                 Expanded(
                   child: dumpBox.hasPhotos
@@ -115,7 +141,6 @@ class _DumpBoxScreenState extends State<DumpBoxScreen> {
     );
   }
 
-  /// Build the photo grid
   Widget _buildPhotoGrid(BuildContext context, DumpBoxProvider dumpBox) {
     return GridView.builder(
       padding: const EdgeInsets.all(AppTheme.spacingMd),
@@ -131,7 +156,8 @@ class _DumpBoxScreenState extends State<DumpBoxScreen> {
         final isSelected = dumpBox.selectedIds.contains(photo.id);
 
         return GestureDetector(
-          onTap: () => dumpBox.toggleSelection(photo.id),
+          onTap: () => _showPhotoViewer(context, photo, dumpBox),
+          onLongPress: () => dumpBox.toggleSelection(photo.id),
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
@@ -153,29 +179,28 @@ class _DumpBoxScreenState extends State<DumpBoxScreen> {
                   ),
                   child: photo.thumbnail != null
                       ? ClipRRect(
-                          borderRadius: BorderRadius.circular(
-                            AppTheme.radiusSmall - 2,
-                          ),
+                          borderRadius:
+                              BorderRadius.circular(AppTheme.radiusSmall - 2),
                           child: Image.memory(
                             photo.thumbnail!,
                             fit: BoxFit.cover,
                           ),
                         )
-                      : const Icon(
-                          Icons.image,
-                          color: AppTheme.textMuted,
-                          size: 40,
-                        ),
+                      : const Icon(Icons.image,
+                          color: AppTheme.textMuted, size: 40),
                 ),
 
                 // Selection checkbox
                 Positioned(
                   top: AppTheme.spacingXs,
                   right: AppTheme.spacingXs,
-                  child: CircularCheckbox(
-                    value: isSelected,
-                    onChanged: (_) => dumpBox.toggleSelection(photo.id),
-                    size: 24,
+                  child: GestureDetector(
+                    onTap: () => dumpBox.toggleSelection(photo.id),
+                    child: CircularCheckbox(
+                      value: isSelected,
+                      onChanged: (_) => dumpBox.toggleSelection(photo.id),
+                      size: 24,
+                    ),
                   ),
                 ),
 
@@ -186,9 +211,7 @@ class _DumpBoxScreenState extends State<DumpBoxScreen> {
                     left: AppTheme.spacingXs,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 2,
-                      ),
+                          horizontal: 4, vertical: 2),
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.7),
                         borderRadius: BorderRadius.circular(4),
@@ -196,18 +219,13 @@ class _DumpBoxScreenState extends State<DumpBoxScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
-                            Icons.videocam,
-                            color: Colors.white,
-                            size: 12,
-                          ),
+                          const Icon(Icons.videocam,
+                              color: Colors.white, size: 12),
                           const SizedBox(width: 2),
                           Text(
                             photo.formattedDuration,
                             style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                            ),
+                                color: Colors.white, fontSize: 10),
                           ),
                         ],
                       ),
@@ -221,29 +239,20 @@ class _DumpBoxScreenState extends State<DumpBoxScreen> {
     );
   }
 
-  /// Build empty state
   Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
-            Icons.inbox_outlined,
-            size: 80,
-            color: AppTheme.textMuted,
-          ),
+          const Icon(Icons.inbox_outlined, size: 80, color: AppTheme.textMuted),
           const SizedBox(height: AppTheme.spacingMd),
           Text(
             AppConstants.emptyDumpBoxTitle,
-            style: AppTheme.h3.copyWith(
-              color: AppTheme.textMuted,
-            ),
+            style: AppTheme.h3.copyWith(color: AppTheme.textMuted),
           ),
           const SizedBox(height: AppTheme.spacingSm),
           Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppTheme.spacingXl,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingXl),
             child: Text(
               AppConstants.emptyDumpBoxMessage,
               style: AppTheme.caption,
@@ -255,23 +264,17 @@ class _DumpBoxScreenState extends State<DumpBoxScreen> {
     );
   }
 
-  /// Build bottom action buttons
   Widget _buildBottomActions(BuildContext context, DumpBoxProvider dumpBox) {
     return Container(
       padding: const EdgeInsets.all(AppTheme.spacingMd),
       decoration: const BoxDecoration(
         color: AppTheme.backgroundMain,
-        border: Border(
-          top: BorderSide(
-            color: AppTheme.borderColor,
-            width: 1,
-          ),
-        ),
+        border: Border(top: BorderSide(color: AppTheme.borderColor, width: 1)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Clear Selection Button
+          // Select/Clear Button
           SizedBox(
             width: double.infinity,
             height: 48,
@@ -280,14 +283,11 @@ class _DumpBoxScreenState extends State<DumpBoxScreen> {
                   ? dumpBox.clearSelection
                   : dumpBox.selectAll,
               icon: Icon(
-                dumpBox.selectedCount > 0 ? Icons.deselect : Icons.select_all,
-                size: 20,
-              ),
-              label: Text(
-                dumpBox.selectedCount > 0
-                    ? AppConstants.buttonClearSelection
-                    : 'Select All',
-              ),
+                  dumpBox.selectedCount > 0 ? Icons.deselect : Icons.select_all,
+                  size: 20),
+              label: Text(dumpBox.selectedCount > 0
+                  ? AppConstants.buttonClearSelection
+                  : 'Select All'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppTheme.textPrimary,
                 side: const BorderSide(color: AppTheme.borderColor),
@@ -303,7 +303,6 @@ class _DumpBoxScreenState extends State<DumpBoxScreen> {
           // Delete and Keep Buttons
           Row(
             children: [
-              // Delete Selected
               Expanded(
                 child: SizedBox(
                   height: 56,
@@ -316,32 +315,25 @@ class _DumpBoxScreenState extends State<DumpBoxScreen> {
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppTheme.textPrimary,
-                            ),
+                                strokeWidth: 2, color: AppTheme.textPrimary),
                           )
                         : const Icon(Icons.delete_outline, size: 20),
                     label: Text(
-                      '${AppConstants.buttonDelete} (${dumpBox.selectedCount})',
-                    ),
+                        '${AppConstants.buttonDelete} (${dumpBox.selectedCount})'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: dumpBox.selectedCount > 0
                           ? AppTheme.deleteColorDark
                           : AppTheme.backgroundCardAlt,
                       foregroundColor: AppTheme.textPrimary,
                       shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppTheme.radiusPill),
-                      ),
+                          borderRadius:
+                              BorderRadius.circular(AppTheme.radiusPill)),
                       elevation: 0,
                     ),
                   ),
                 ),
               ),
-
               const SizedBox(width: AppTheme.spacingMd),
-
-              // Keep Selected
               Expanded(
                 child: SizedBox(
                   height: 56,
@@ -350,17 +342,15 @@ class _DumpBoxScreenState extends State<DumpBoxScreen> {
                         dumpBox.selectedCount > 0 ? dumpBox.keepSelected : null,
                     icon: const Icon(Icons.download, size: 20),
                     label: Text(
-                      '${AppConstants.buttonKeep} (${dumpBox.selectedCount})',
-                    ),
+                        '${AppConstants.buttonKeep} (${dumpBox.selectedCount})'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: dumpBox.selectedCount > 0
                           ? AppTheme.keepColorDark
                           : AppTheme.backgroundCardAlt,
                       foregroundColor: AppTheme.textPrimary,
                       shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppTheme.radiusPill),
-                      ),
+                          borderRadius:
+                              BorderRadius.circular(AppTheme.radiusPill)),
                       elevation: 0,
                     ),
                   ),
@@ -373,7 +363,6 @@ class _DumpBoxScreenState extends State<DumpBoxScreen> {
     );
   }
 
-  /// Show delete confirmation dialog
   void _showDeleteConfirmation(BuildContext context, DumpBoxProvider dumpBox) {
     showDialog(
       context: context,
@@ -389,6 +378,109 @@ class _DumpBoxScreenState extends State<DumpBoxScreen> {
           Navigator.pop(context);
           _deleteSelectedPhotos(dumpBox);
         },
+      ),
+    );
+  }
+}
+
+/// Full-screen photo viewer dialog
+class _PhotoViewerDialog extends StatelessWidget {
+  final PhotoModel photo;
+  final VoidCallback onDelete;
+  final VoidCallback onKeep;
+
+  const _PhotoViewerDialog({
+    required this.photo,
+    required this.onDelete,
+    required this.onKeep,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Close button
+          Align(
+            alignment: Alignment.topRight,
+            child: IconButton(
+              icon: const Icon(Icons.close, color: Colors.white, size: 30),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+
+          // Photo
+          Flexible(
+            child: Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.6,
+              ),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+                child: photo.thumbnail != null
+                    ? Image.memory(
+                        photo.thumbnail!,
+                        fit: BoxFit.contain,
+                      )
+                    : Container(
+                        color: AppTheme.backgroundCard,
+                        child: const Icon(Icons.image,
+                            size: 100, color: AppTheme.textMuted),
+                      ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: AppTheme.spacingLg),
+
+          // Action buttons
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Delete button
+              ElevatedButton.icon(
+                onPressed: onDelete,
+                icon: const Icon(Icons.delete),
+                label: const Text('Delete'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.deleteColor,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: AppTheme.spacingLg),
+
+              // Keep button
+              ElevatedButton.icon(
+                onPressed: onKeep,
+                icon: const Icon(Icons.favorite),
+                label: const Text('Keep'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.keepColor,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: AppTheme.spacingMd),
+        ],
       ),
     );
   }

@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../config/routes.dart';
-import '../services/storage_service.dart';
-import '../services/permission_service.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/privacy_card.dart';
 import '../widgets/custom_checkbox.dart';
 
-/// Screen 1: Welcome Screen with Privacy & Disclaimer
+/// Screen 1: Welcome Screen - Shows EVERY time for legal protection
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
 
@@ -17,55 +15,15 @@ class WelcomeScreen extends StatefulWidget {
 }
 
 class _WelcomeScreenState extends State<WelcomeScreen> {
-  final _storageService = StorageService.instance;
-  final _permissionService = PermissionService.instance;
-
   bool _hasAgreed = false;
-  bool _isLoading = true;
 
-  @override
-  void initState() {
-    super.initState();
-    _checkInitialState();
-  }
-
-  Future<void> _checkInitialState() async {
-    final hasAccepted = await _storageService.hasAcceptedTerms();
-
-    if (hasAccepted && mounted) {
-      final permState = await _permissionService.checkPermission();
-
-      if (_permissionService.hasAccess) {
-        AppRoutes.navigateAndClear(context, AppRoutes.category);
-      } else {
-        AppRoutes.navigateAndClear(context, AppRoutes.permission);
-      }
-    } else {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _onContinue() async {
+  void _onContinue() {
     if (!_hasAgreed) return;
-    await _storageService.setTermsAccepted(true);
-    if (mounted) {
-      AppRoutes.navigateTo(context, AppRoutes.permission);
-    }
+    AppRoutes.navigateTo(context, AppRoutes.category);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: AppTheme.backgroundMain,
-        body: Center(
-          child: CircularProgressIndicator(
-            color: AppTheme.accentPrimary,
-          ),
-        ),
-      );
-    }
-
     return Scaffold(
       backgroundColor: AppTheme.backgroundMain,
       body: SafeArea(
@@ -78,25 +36,20 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             children: [
               const SizedBox(height: AppTheme.spacingMd),
 
-              // Logo - smaller
+              // Logo
               const AppLogo(size: 60),
               const SizedBox(height: AppTheme.spacingMd),
 
               // Welcome Text
               Text(
                 'Welcome to',
-                style: AppTheme.body.copyWith(
-                  color: AppTheme.textSecondary,
-                ),
+                style: AppTheme.body.copyWith(color: AppTheme.textSecondary),
               ),
-              Text(
-                AppConstants.appName,
-                style: AppTheme.h2,
-              ),
+              Text(AppConstants.appName, style: AppTheme.h2),
 
               const SizedBox(height: AppTheme.spacingMd),
 
-              // Privacy Card - will expand to fill space
+              // Privacy Card
               const Expanded(child: PrivacyCard()),
 
               const SizedBox(height: AppTheme.spacingSm),
@@ -140,9 +93,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             Expanded(
               child: Text(
                 'I understand and agree to these terms',
-                style: AppTheme.caption.copyWith(
-                  fontWeight: FontWeight.w500,
-                ),
+                style: AppTheme.caption.copyWith(fontWeight: FontWeight.w500),
               ),
             ),
           ],
