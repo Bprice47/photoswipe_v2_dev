@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:photo_manager/photo_manager.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../config/routes.dart';
@@ -9,8 +10,58 @@ import '../widgets/custom_checkbox.dart';
 
 /// Screen 6 & 7: DumpBox Screen
 /// Review photos marked for deletion before permanent removal
-class DumpBoxScreen extends StatelessWidget {
+class DumpBoxScreen extends StatefulWidget {
   const DumpBoxScreen({super.key});
+
+  @override
+  State<DumpBoxScreen> createState() => _DumpBoxScreenState();
+}
+
+class _DumpBoxScreenState extends State<DumpBoxScreen> {
+  bool _isDeleting = false;
+
+  /// Actually delete photos from device
+  Future<void> _deleteSelectedPhotos(DumpBoxProvider dumpBox) async {
+    if (dumpBox.selectedCount == 0) return;
+
+    setState(() => _isDeleting = true);
+
+    try {
+      // Get IDs of selected photos
+      final selectedPhotos = dumpBox.getSelectedPhotos();
+      final photoIds = selectedPhotos.map((p) => p.id).toList();
+
+      // Delete using photo_manager (triggers system confirmation on iOS)
+      final deletedIds = await PhotoManager.editor.deleteWithIds(photoIds);
+
+      // Remove deleted photos from dumpbox
+      for (final id in deletedIds) {
+        dumpBox.removePhoto(id);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${deletedIds.length} photos deleted'),
+            backgroundColor: AppTheme.keepColor,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting photos: $e'),
+            backgroundColor: AppTheme.deleteColor,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isDeleting = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +104,7 @@ class DumpBoxScreen extends StatelessWidget {
                       ? _buildPhotoGrid(context, dumpBox)
                       : _buildEmptyState(),
                 ),
-                
+
                 // Bottom Actions
                 if (dumpBox.hasPhotos) _buildBottomActions(context, dumpBox),
               ],
@@ -78,27 +129,27 @@ class DumpBoxScreen extends StatelessWidget {
       itemBuilder: (context, index) {
         final photo = dumpBox.photos[index];
         final isSelected = dumpBox.selectedIds.contains(photo.id);
-        
+
         return GestureDetector(
           onTap: () => dumpBox.toggleSelection(photo.id),
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
               border: Border.all(
-                color: isSelected
-                    ? AppTheme.selectedBorder
-                    : Colors.transparent,
+                color:
+                    isSelected ? AppTheme.selectedBorder : Colors.transparent,
                 width: 3,
               ),
             ),
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // Photo placeholder
+                // Photo
                 Container(
                   decoration: BoxDecoration(
                     color: AppTheme.backgroundCardAlt,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusSmall - 2),
+                    borderRadius:
+                        BorderRadius.circular(AppTheme.radiusSmall - 2),
                   ),
                   child: photo.thumbnail != null
                       ? ClipRRect(
@@ -110,13 +161,13 @@ class DumpBoxScreen extends StatelessWidget {
                             fit: BoxFit.cover,
                           ),
                         )
-                      : Icon(
+                      : const Icon(
                           Icons.image,
                           color: AppTheme.textMuted,
                           size: 40,
                         ),
                 ),
-                
+
                 // Selection checkbox
                 Positioned(
                   top: AppTheme.spacingXs,
@@ -127,6 +178,41 @@ class DumpBoxScreen extends StatelessWidget {
                     size: 24,
                   ),
                 ),
+
+                // Video indicator
+                if (photo.isVideo)
+                  Positioned(
+                    bottom: AppTheme.spacingXs,
+                    left: AppTheme.spacingXs,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.videocam,
+                            color: Colors.white,
+                            size: 12,
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            photo.formattedDuration,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -141,7 +227,7 @@ class DumpBoxScreen extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
+          const Icon(
             Icons.inbox_outlined,
             size: 80,
             color: AppTheme.textMuted,
@@ -173,7 +259,7 @@ class DumpBoxScreen extends StatelessWidget {
   Widget _buildBottomActions(BuildContext context, DumpBoxProvider dumpBox) {
     return Container(
       padding: const EdgeInsets.all(AppTheme.spacingMd),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: AppTheme.backgroundMain,
         border: Border(
           top: BorderSide(
@@ -194,9 +280,7 @@ class DumpBoxScreen extends StatelessWidget {
                   ? dumpBox.clearSelection
                   : dumpBox.selectAll,
               icon: Icon(
-                dumpBox.selectedCount > 0
-                    ? Icons.deselect
-                    : Icons.select_all,
+                dumpBox.selectedCount > 0 ? Icons.deselect : Icons.select_all,
                 size: 20,
               ),
               label: Text(
@@ -213,9 +297,9 @@ class DumpBoxScreen extends StatelessWidget {
               ),
             ),
           ),
-          
+
           const SizedBox(height: AppTheme.spacingMd),
-          
+
           // Delete and Keep Buttons
           Row(
             children: [
@@ -224,10 +308,19 @@ class DumpBoxScreen extends StatelessWidget {
                 child: SizedBox(
                   height: 56,
                   child: ElevatedButton.icon(
-                    onPressed: dumpBox.selectedCount > 0
+                    onPressed: (dumpBox.selectedCount > 0 && !_isDeleting)
                         ? () => _showDeleteConfirmation(context, dumpBox)
                         : null,
-                    icon: const Icon(Icons.delete_outline, size: 20),
+                    icon: _isDeleting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppTheme.textPrimary,
+                            ),
+                          )
+                        : const Icon(Icons.delete_outline, size: 20),
                     label: Text(
                       '${AppConstants.buttonDelete} (${dumpBox.selectedCount})',
                     ),
@@ -237,24 +330,24 @@ class DumpBoxScreen extends StatelessWidget {
                           : AppTheme.backgroundCardAlt,
                       foregroundColor: AppTheme.textPrimary,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+                        borderRadius:
+                            BorderRadius.circular(AppTheme.radiusPill),
                       ),
                       elevation: 0,
                     ),
                   ),
                 ),
               ),
-              
+
               const SizedBox(width: AppTheme.spacingMd),
-              
+
               // Keep Selected
               Expanded(
                 child: SizedBox(
                   height: 56,
                   child: ElevatedButton.icon(
-                    onPressed: dumpBox.selectedCount > 0
-                        ? dumpBox.keepSelected
-                        : null,
+                    onPressed:
+                        dumpBox.selectedCount > 0 ? dumpBox.keepSelected : null,
                     icon: const Icon(Icons.download, size: 20),
                     label: Text(
                       '${AppConstants.buttonKeep} (${dumpBox.selectedCount})',
@@ -265,7 +358,8 @@ class DumpBoxScreen extends StatelessWidget {
                           : AppTheme.backgroundCardAlt,
                       foregroundColor: AppTheme.textPrimary,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+                        borderRadius:
+                            BorderRadius.circular(AppTheme.radiusPill),
                       ),
                       elevation: 0,
                     ),
@@ -292,16 +386,8 @@ class DumpBoxScreen extends StatelessWidget {
         confirmColor: AppTheme.deleteColor,
         onCancel: () => Navigator.pop(context),
         onConfirm: () {
-          // TODO: Implement actual photo deletion in Phase 9
-          dumpBox.removeSelected();
           Navigator.pop(context);
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${dumpBox.selectedCount} photos deleted'),
-              backgroundColor: AppTheme.backgroundCardAlt,
-            ),
-          );
+          _deleteSelectedPhotos(dumpBox);
         },
       ),
     );
