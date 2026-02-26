@@ -159,11 +159,10 @@ class PhotoProvider extends ChangeNotifier {
 
       debugPrint('Filtered to ${filteredAssets.length} assets');
 
-      // LIMIT TO 1000 PHOTOS MAX to prevent memory crash
-      const int maxPhotosToLoad = 1000;
-      if (filteredAssets.length > maxPhotosToLoad) {
-        debugPrint('Limiting from ${filteredAssets.length} to $maxPhotosToLoad photos');
-        filteredAssets = filteredAssets.sublist(0, maxPhotosToLoad);
+      // LIMIT TO MAX PHOTOS to prevent memory crash
+      if (filteredAssets.length > AppConstants.maxPhotosToLoad) {
+        debugPrint('Limiting from ${filteredAssets.length} to ${AppConstants.maxPhotosToLoad} photos');
+        filteredAssets = filteredAssets.sublist(0, AppConstants.maxPhotosToLoad);
       }
 
       // Load thumbnails for first batch (for smooth UX)
