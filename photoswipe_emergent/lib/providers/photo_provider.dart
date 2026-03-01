@@ -259,9 +259,73 @@ class PhotoProvider extends ChangeNotifier {
   }
 
   /// Move to next photo (called after swipe)
+  /// Triggers auto-load when approaching the end of current batch
   void nextPhoto() {
     if (_currentIndex < _photos.length) {
       _currentIndex++;
+      notifyListeners();
+      
+      // Auto-load when 100 photos remaining and more batches available
+      if (remainingCount <= 100 && hasMoreToLoad && !_isLoadingMore) {
+        _loadNextBatch();
+      }
+    }
+  }
+
+  /// Load next batch of photos automatically
+  Future<void> _loadNextBatch() async {
+    if (_isLoadingMore || !hasMoreToLoad) return;
+    
+    _isLoadingMore = true;
+    notifyListeners();
+    
+    try {
+      _currentBatchStart += AppConstants.maxPhotosToLoad;
+      
+      int endIndex = _currentBatchStart + AppConstants.maxPhotosToLoad;
+      if (endIndex > _filteredAssets.length) {
+        endIndex = _filteredAssets.length;
+      }
+      
+      List<AssetEntity> nextBatch = _filteredAssets.sublist(_currentBatchStart, endIndex);
+      
+      debugPrint('Auto-loading next batch: ${nextBatch.length} photos (starting at $_currentBatchStart)');
+      
+      for (int i = 0; i < nextBatch.length; i++) {
+        final asset = nextBatch[i];
+        
+        try {
+          final thumbnail = await asset.thumbnailDataWithSize(
+            const ThumbnailSize(800, 800),
+            quality: 85,
+          );
+          
+          _photos.add(PhotoModel(
+            id: asset.id,
+            createDate: asset.createDateTime,
+            modifyDate: asset.modifiedDateTime,
+            width: asset.width,
+            height: asset.height,
+            type: asset.type == AssetType.video ? PhotoType.video : PhotoType.image,
+            duration: asset.type == AssetType.video ? asset.duration : null,
+            thumbnail: thumbnail,
+          ));
+          
+          // Update UI every 20 photos
+          if (i % 20 == 0) {
+            notifyListeners();
+          }
+        } catch (e) {
+          debugPrint('Error loading photo in next batch: $e');
+        }
+      }
+      
+      _isLoadingMore = false;
+      notifyListeners();
+      debugPrint('Auto-load complete. Total photos now: ${_photos.length}');
+    } catch (e) {
+      debugPrint('Error loading next batch: $e');
+      _isLoadingMore = false;
       notifyListeners();
     }
   }
