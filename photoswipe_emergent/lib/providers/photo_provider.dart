@@ -169,11 +169,16 @@ class PhotoProvider extends ChangeNotifier {
 
       debugPrint('Filtered to ${filteredAssets.length} assets');
 
-      // LIMIT TO MAX PHOTOS to prevent memory crash
-      if (filteredAssets.length > AppConstants.maxPhotosToLoad) {
-        debugPrint('Limiting from ${filteredAssets.length} to ${AppConstants.maxPhotosToLoad} photos');
-        filteredAssets = filteredAssets.sublist(0, AppConstants.maxPhotosToLoad);
-      }
+      // Store filtered assets for auto-load functionality
+      _filteredAssets = filteredAssets;
+      _currentBatchStart = 0;
+
+      // Get current batch (first 1000 or less)
+      List<AssetEntity> currentBatch = filteredAssets.length > AppConstants.maxPhotosToLoad
+          ? filteredAssets.sublist(0, AppConstants.maxPhotosToLoad)
+          : filteredAssets;
+
+      debugPrint('Loading batch of ${currentBatch.length} photos (${filteredAssets.length} total available)');
 
       // Load thumbnails for first batch (for smooth UX)
       final int initialBatchSize = 10;
