@@ -184,8 +184,8 @@ class PhotoProvider extends ChangeNotifier {
       final int initialBatchSize = 10;
       List<PhotoModel> loadedPhotos = [];
 
-      for (int i = 0; i < filteredAssets.length && i < initialBatchSize; i++) {
-        final asset = filteredAssets[i];
+      for (int i = 0; i < currentBatch.length && i < initialBatchSize; i++) {
+        final asset = currentBatch[i];
         final thumbnail = await asset.thumbnailDataWithSize(
           const ThumbnailSize(800, 800),
           quality: 85,
@@ -211,7 +211,7 @@ class PhotoProvider extends ChangeNotifier {
       debugPrint('Initial batch loaded: ${_photos.length} photos');
 
       // Load remaining thumbnails in background
-      _loadRemainingPhotos(filteredAssets, initialBatchSize);
+      _loadRemainingPhotos(currentBatch, initialBatchSize);
     } catch (e) {
       _errorMessage = e.toString();
       _isLoading = false;
