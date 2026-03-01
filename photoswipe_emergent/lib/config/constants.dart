@@ -76,7 +76,10 @@ class AppConstants {
   // ============== CATEGORY OPTIONS ==============
 
   static const String categoryMostRecent = 'Most Recent';
-  static const String categoryMostRecentDesc = 'Start with newest photos';
+  static const String categoryMostRecentDesc = 'Only unreviewed photos';
+
+  static const String categoryAllPhotos = 'All Photos';
+  static const String categoryAllPhotosDesc = 'Review everything again';
 
   static const String categoryOldest = 'Oldest';
   static const String categoryOldestDesc = 'Start with oldest photos';
@@ -89,6 +92,21 @@ class AppConstants {
 
   static const String categoryResume = 'Resume Last Session';
   static const String categoryResumeDesc = 'Continue with unreviewed photos';
+
+  // ============== DUMPBOX SETTINGS ==============
+
+  /// Maximum photos in dumpbox before requiring review
+  static const int maxDumpBoxPhotos = 30;
+
+  // ============== HELP TEXT ==============
+
+  static const String helpMostRecentVsAllTitle = 'What\'s the difference?';
+  static const String helpMostRecentVsAll = '''
+Most Recent: Shows only photos you haven\'t swiped yet. Perfect for cleaning new photos without re-reviewing old ones.
+
+All Photos: Shows your entire library, including photos you\'ve already kept. Great for a fresh start or re-reviewing saved photos.
+
+Note: Deleted photos are permanently removed and won\'t appear in either option.''';
 
   // ============== EMPTY STATES ==============
 
@@ -123,11 +141,12 @@ class AppConstants {
 
 /// Filter types for photo loading
 enum FilterType {
-  mostRecent,
-  oldest,
-  videos,
-  dateRange,
-  resume,
+  mostRecent,    // Skip reviewed photos, newest first
+  allPhotos,     // Show ALL photos (including reviewed), newest first
+  oldest,        // Skip reviewed photos, oldest first
+  videos,        // Skip reviewed videos, newest first
+  dateRange,     // Custom date range, oldest first (start date forward)
+  resume,        // Continue from where user left off
 }
 
 /// Sort order for photos
