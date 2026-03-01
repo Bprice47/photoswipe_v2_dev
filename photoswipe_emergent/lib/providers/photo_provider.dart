@@ -8,27 +8,33 @@ import '../config/constants.dart';
 class PhotoProvider extends ChangeNotifier {
   List<PhotoModel> _photos = [];
   List<AssetEntity> _allAssets = [];
+  List<AssetEntity> _filteredAssets = []; // Store filtered assets for auto-load
   int _currentIndex = 0;
   bool _isLoading = false;
+  bool _isLoadingMore = false; // For auto-load indicator
   String? _errorMessage;
   FilterType _currentFilter = FilterType.mostRecent;
   DateTime? _startDate;
   DateTime? _endDate;
   int _totalCount = 0;
+  int _currentBatchStart = 0; // Track which batch we're on
   Set<String> _reviewedPhotoIds = {};
 
   // Getters
   List<PhotoModel> get photos => _photos;
   int get currentIndex => _currentIndex;
   bool get isLoading => _isLoading;
+  bool get isLoadingMore => _isLoadingMore;
   String? get errorMessage => _errorMessage;
   FilterType get currentFilter => _currentFilter;
   int get remainingCount => _photos.length - _currentIndex;
   int get totalCount => _totalCount;
+  int get totalFilteredCount => _filteredAssets.length; // Total available after filtering
   Set<String> get reviewedPhotoIds => _reviewedPhotoIds;
   PhotoModel? get currentPhoto =>
       _currentIndex < _photos.length ? _photos[_currentIndex] : null;
   bool get hasPhotos => _photos.isNotEmpty && _currentIndex < _photos.length;
+  bool get hasMoreToLoad => _currentBatchStart + AppConstants.maxPhotosToLoad < _filteredAssets.length;
 
   /// Initialize - load reviewed photo IDs from storage
   Future<void> init() async {
