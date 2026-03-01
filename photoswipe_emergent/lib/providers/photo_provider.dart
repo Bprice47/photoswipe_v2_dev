@@ -358,6 +358,9 @@ class PhotoProvider extends ChangeNotifier {
   void reset() {
     _currentIndex = 0;
     _photos = [];
+    _filteredAssets = [];
+    _currentBatchStart = 0;
+    _isLoadingMore = false;
     _errorMessage = null;
     notifyListeners();
   }
