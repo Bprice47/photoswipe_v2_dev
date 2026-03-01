@@ -181,6 +181,58 @@ class _SwipeScreenState extends State<SwipeScreen> {
     dumpBoxProvider.removeLastPhoto();
   }
 
+  /// Build the progress indicator with auto-load status
+  Widget _buildProgressIndicator(PhotoProvider photoProvider) {
+    final currentPosition = photoProvider.currentIndex + 1;
+    final loadedCount = photoProvider.photos.length;
+    final totalAvailable = photoProvider.totalFilteredCount;
+    final isLoadingMore = photoProvider.isLoadingMore;
+    final hasMore = photoProvider.hasMoreToLoad;
+
+    return Column(
+      children: [
+        // Main progress text
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Photo $currentPosition of $loadedCount',
+              style: AppTheme.body,
+            ),
+            if (hasMore || totalAvailable > loadedCount) ...[
+              Text(
+                ' ($totalAvailable total)',
+                style: AppTheme.caption,
+              ),
+            ],
+          ],
+        ),
+        // Auto-loading indicator
+        if (isLoadingMore) ...[
+          const SizedBox(height: AppTheme.spacingXs),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppTheme.accentPrimary,
+                ),
+              ),
+              const SizedBox(width: AppTheme.spacingXs),
+              Text(
+                'Loading more photos...',
+                style: AppTheme.caption,
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer2<PhotoProvider, DumpBoxProvider>(
