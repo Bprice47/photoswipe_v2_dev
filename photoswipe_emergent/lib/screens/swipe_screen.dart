@@ -69,6 +69,11 @@ class _SwipeScreenState extends State<SwipeScreen> {
       PhotoProvider photoProvider, DumpBoxProvider dumpBoxProvider) {
     final currentPhoto = photoProvider.currentPhoto;
     if (currentPhoto != null) {
+      // Check if dumpbox is full
+      if (dumpBoxProvider.isFull) {
+        _showDumpboxFullDialog(dumpBoxProvider);
+        return;
+      }
       dumpBoxProvider.addPhoto(currentPhoto);
     }
     _swiperController.swipe(CardSwiperDirection.left);
@@ -76,6 +81,72 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
   void _onSwipeRight(PhotoProvider photoProvider) {
     _swiperController.swipe(CardSwiperDirection.right);
+  }
+
+  /// Show dialog when dumpbox is full
+  void _showDumpboxFullDialog(DumpBoxProvider dumpBoxProvider) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.backgroundCard,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.inbox, color: AppTheme.accentPrimary),
+            const SizedBox(width: AppTheme.spacingSm),
+            Text('DumpBox Full!', style: AppTheme.h3),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'You have ${AppConstants.maxDumpBoxPhotos} photos waiting to be reviewed.',
+              style: AppTheme.body,
+            ),
+            const SizedBox(height: AppTheme.spacingMd),
+            Text(
+              'Let\'s review and delete them before continuing!',
+              style: AppTheme.bodySecondary,
+            ),
+            // Show ad placeholder for non-subscribers
+            if (!dumpBoxProvider.isSubscriber) ...[
+              const SizedBox(height: AppTheme.spacingLg),
+              Container(
+                height: 60,
+                decoration: BoxDecoration(
+                  color: AppTheme.backgroundCardAlt,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+                  border: Border.all(color: AppTheme.textMuted.withOpacity(0.3)),
+                ),
+                child: Center(
+                  child: Text(
+                    '[ Ad Placeholder ]',
+                    style: AppTheme.caption,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              AppRoutes.navigateTo(context, AppRoutes.dumpbox);
+            },
+            child: Text(
+              'Review DumpBox',
+              style: TextStyle(color: AppTheme.accentPrimary, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   bool _onSwipe(
@@ -88,7 +159,12 @@ class _SwipeScreenState extends State<SwipeScreen> {
         Provider.of<DumpBoxProvider>(context, listen: false);
 
     if (direction == CardSwiperDirection.left) {
-      // Swiped left - add to dumpbox (not marked as reviewed)
+      // Check if dumpbox is full before adding
+      if (dumpBoxProvider.isFull) {
+        _showDumpboxFullDialog(dumpBoxProvider);
+        return false; // Prevent the swipe
+      }
+      // Swiped left - add to dumpbox and mark as reviewed
       final photo = photoProvider.photos[previousIndex];
       dumpBoxProvider.addPhoto(photo);
       photoProvider.swipeLeft();
