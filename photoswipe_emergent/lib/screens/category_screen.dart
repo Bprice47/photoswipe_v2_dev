@@ -7,8 +7,45 @@ import '../widgets/app_drawer.dart';
 
 /// Screen 3: Category Screen - Main Menu
 /// Let user choose how they want to review photos
-class CategoryScreen extends StatelessWidget {
+class CategoryScreen extends StatefulWidget {
   const CategoryScreen({super.key});
+
+  @override
+  State<CategoryScreen> createState() => _CategoryScreenState();
+}
+
+class _CategoryScreenState extends State<CategoryScreen> {
+  // 0 = Most Recent (skip reviewed), 1 = All Photos
+  int _selectedPhotoMode = 0;
+
+  void _showHelpDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.backgroundCard,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+        ),
+        title: Text(
+          AppConstants.helpMostRecentVsAllTitle,
+          style: AppTheme.h3,
+        ),
+        content: Text(
+          AppConstants.helpMostRecentVsAll,
+          style: AppTheme.body,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Got it',
+              style: TextStyle(color: AppTheme.accentPrimary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,16 +94,8 @@ class CategoryScreen extends StatelessWidget {
               Expanded(
                 child: ListView(
                   children: [
-                    // Most Recent
-                    CategoryTile(
-                      icon: Icons.access_time,
-                      title: AppConstants.categoryMostRecent,
-                      subtitle: AppConstants.categoryMostRecentDesc,
-                      onTap: () => _navigateToSwipe(
-                        context,
-                        FilterType.mostRecent,
-                      ),
-                    ),
+                    // Segmented Toggle: Most Recent | All Photos with Help Icon
+                    _buildPhotoModeSelector(),
                     const SizedBox(height: AppTheme.spacingMd),
 
                     // Oldest
@@ -121,6 +150,158 @@ class CategoryScreen extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// Build the segmented toggle for Most Recent / All Photos
+  Widget _buildPhotoModeSelector() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.backgroundCardAlt,
+        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+      ),
+      child: Column(
+        children: [
+          // Segmented toggle with help icon
+          Padding(
+            padding: const EdgeInsets.all(AppTheme.spacingMd),
+            child: Row(
+              children: [
+                // Icon
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppTheme.accentPrimary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+                  ),
+                  child: Icon(
+                    Icons.photo_library,
+                    color: AppTheme.accentPrimary,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: AppTheme.spacingMd),
+
+                // Segmented Control
+                Expanded(
+                  child: Container(
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppTheme.backgroundMain,
+                      borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+                    ),
+                    child: Row(
+                      children: [
+                        // Most Recent Tab
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() => _selectedPhotoMode = 0);
+                              _navigateToSwipe(context, FilterType.mostRecent);
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: _selectedPhotoMode == 0
+                                    ? AppTheme.accentPrimary
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'Most Recent',
+                                  style: TextStyle(
+                                    color: _selectedPhotoMode == 0
+                                        ? AppTheme.textPrimary
+                                        : AppTheme.textSecondary,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        // All Photos Tab
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() => _selectedPhotoMode = 1);
+                              _navigateToSwipe(context, FilterType.allPhotos);
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: _selectedPhotoMode == 1
+                                    ? AppTheme.accentPrimary
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'All Photos',
+                                  style: TextStyle(
+                                    color: _selectedPhotoMode == 1
+                                        ? AppTheme.textPrimary
+                                        : AppTheme.textSecondary,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(width: AppTheme.spacingSm),
+
+                // Help Icon
+                GestureDetector(
+                  onTap: _showHelpDialog,
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: AppTheme.textMuted.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: Text(
+                        '?',
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Subtitle below the toggle
+          Padding(
+            padding: const EdgeInsets.only(
+              left: AppTheme.spacingMd + 48 + AppTheme.spacingMd,
+              right: AppTheme.spacingMd,
+              bottom: AppTheme.spacingMd,
+            ),
+            child: Text(
+              _selectedPhotoMode == 0
+                  ? AppConstants.categoryMostRecentDesc
+                  : AppConstants.categoryAllPhotosDesc,
+              style: AppTheme.caption,
+            ),
+          ),
+        ],
       ),
     );
   }
