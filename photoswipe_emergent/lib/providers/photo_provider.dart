@@ -267,8 +267,11 @@ class PhotoProvider extends ChangeNotifier {
     nextPhoto();
   }
 
-  /// Swipe left - goes to dumpbox (don't mark as reviewed)
-  void swipeLeft() {
+  /// Swipe left - goes to dumpbox AND mark as reviewed
+  Future<void> swipeLeft() async {
+    if (currentPhoto != null) {
+      await markAsReviewed(currentPhoto!.id);
+    }
     nextPhoto();
   }
 
