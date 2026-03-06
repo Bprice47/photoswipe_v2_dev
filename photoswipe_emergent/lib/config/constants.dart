@@ -22,11 +22,8 @@ class AppConstants {
   /// Number of photos to load per page
   static const int photosPerPage = 500;
 
-  /// Maximum photos to load per batch (set to 20 for testing, change to 500-1000 for production)
-  static const int maxPhotosToLoad = 20;
-
-  /// When to trigger auto-load (photos remaining before loading next batch)
-  static const int autoLoadThreshold = 5; // Set low for testing with 20 photos
+  /// Maximum photos to load initially (set high to load all)
+  static const int maxInitialPhotos = 50000;
 
   /// Thumbnail size for swipe cards
   static const int thumbnailSize = 800;
@@ -79,10 +76,7 @@ class AppConstants {
   // ============== CATEGORY OPTIONS ==============
 
   static const String categoryMostRecent = 'Most Recent';
-  static const String categoryMostRecentDesc = 'Only unreviewed photos';
-
-  static const String categoryAllPhotos = 'All Photos';
-  static const String categoryAllPhotosDesc = 'Review everything again';
+  static const String categoryMostRecentDesc = 'Start with newest photos';
 
   static const String categoryOldest = 'Oldest';
   static const String categoryOldestDesc = 'Start with oldest photos';
@@ -95,21 +89,6 @@ class AppConstants {
 
   static const String categoryResume = 'Resume Last Session';
   static const String categoryResumeDesc = 'Continue with unreviewed photos';
-
-  // ============== DUMPBOX SETTINGS ==============
-
-  /// Maximum photos in dumpbox before requiring review
-  static const int maxDumpBoxPhotos = 30;
-
-  // ============== HELP TEXT ==============
-
-  static const String helpMostRecentVsAllTitle = 'What\'s the difference?';
-  static const String helpMostRecentVsAll = '''
-Most Recent: Shows only photos you haven\'t swiped yet. Perfect for cleaning new photos without re-reviewing old ones.
-
-All Photos: Shows your entire library, including photos you\'ve already kept. Great for a fresh start or re-reviewing saved photos.
-
-Note: Deleted photos are permanently removed and won\'t appear in either option.''';
 
   // ============== EMPTY STATES ==============
 
@@ -144,12 +123,11 @@ Note: Deleted photos are permanently removed and won\'t appear in either option.
 
 /// Filter types for photo loading
 enum FilterType {
-  mostRecent,    // Skip reviewed photos, newest first
-  allPhotos,     // Show ALL photos (including reviewed), newest first
-  oldest,        // Skip reviewed photos, oldest first
-  videos,        // Skip reviewed videos, newest first
-  dateRange,     // Custom date range, oldest first (start date forward)
-  resume,        // Continue from where user left off
+  mostRecent,
+  oldest,
+  videos,
+  dateRange,
+  resume,
 }
 
 /// Sort order for photos

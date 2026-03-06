@@ -8,33 +8,27 @@ import '../config/constants.dart';
 class PhotoProvider extends ChangeNotifier {
   List<PhotoModel> _photos = [];
   List<AssetEntity> _allAssets = [];
-  List<AssetEntity> _filteredAssets = []; // Store filtered assets for auto-load
   int _currentIndex = 0;
   bool _isLoading = false;
-  bool _isLoadingMore = false; // For auto-load indicator
   String? _errorMessage;
   FilterType _currentFilter = FilterType.mostRecent;
   DateTime? _startDate;
   DateTime? _endDate;
   int _totalCount = 0;
-  int _currentBatchStart = 0; // Track which batch we're on
   Set<String> _reviewedPhotoIds = {};
 
   // Getters
   List<PhotoModel> get photos => _photos;
   int get currentIndex => _currentIndex;
   bool get isLoading => _isLoading;
-  bool get isLoadingMore => _isLoadingMore;
   String? get errorMessage => _errorMessage;
   FilterType get currentFilter => _currentFilter;
   int get remainingCount => _photos.length - _currentIndex;
   int get totalCount => _totalCount;
-  int get totalFilteredCount => _filteredAssets.length; // Total available after filtering
   Set<String> get reviewedPhotoIds => _reviewedPhotoIds;
   PhotoModel? get currentPhoto =>
       _currentIndex < _photos.length ? _photos[_currentIndex] : null;
   bool get hasPhotos => _photos.isNotEmpty && _currentIndex < _photos.length;
-  bool get hasMoreToLoad => _currentBatchStart + AppConstants.maxPhotosToLoad < _filteredAssets.length;
 
   /// Initialize - load reviewed photo IDs from storage
   Future<void> init() async {
@@ -134,18 +128,12 @@ class PhotoProvider extends ChangeNotifier {
       debugPrint('Fetched ${_allAssets.length} asset references');
 
       // Sort based on filter type FIRST
-      // Custom date range sorts oldest first (start date forward)
-      if (_currentFilter == FilterType.oldest || _currentFilter == FilterType.dateRange) {
+      if (_currentFilter == FilterType.oldest) {
         _allAssets.sort((a, b) => a.createDateTime.compareTo(b.createDateTime));
       } else {
-        // Most recent, allPhotos, videos, resume (default - newest first)
+        // Most recent (default)
         _allAssets.sort((a, b) => b.createDateTime.compareTo(a.createDateTime));
       }
-
-      // Determine if we should skip reviewed photos
-      // allPhotos and dateRange show everything; others skip reviewed
-      bool skipReviewed = _currentFilter != FilterType.allPhotos && 
-                          _currentFilter != FilterType.dateRange;
 
       // Filter assets based on criteria
       List<AssetEntity> filteredAssets = [];
@@ -159,9 +147,11 @@ class PhotoProvider extends ChangeNotifier {
           continue;
         }
 
-        // Skip reviewed photos for mostRecent, oldest, videos, resume
-        if (skipReviewed && _reviewedPhotoIds.contains(asset.id)) {
-          continue;
+        // For Resume Session: skip already reviewed photos
+        if (_currentFilter == FilterType.resume) {
+          if (_reviewedPhotoIds.contains(asset.id)) {
+            continue;
+          }
         }
 
         filteredAssets.add(asset);
@@ -169,23 +159,12 @@ class PhotoProvider extends ChangeNotifier {
 
       debugPrint('Filtered to ${filteredAssets.length} assets');
 
-      // Store filtered assets for auto-load functionality
-      _filteredAssets = filteredAssets;
-      _currentBatchStart = 0;
-
-      // Get current batch (first 1000 or less)
-      List<AssetEntity> currentBatch = filteredAssets.length > AppConstants.maxPhotosToLoad
-          ? filteredAssets.sublist(0, AppConstants.maxPhotosToLoad)
-          : filteredAssets;
-
-      debugPrint('Loading batch of ${currentBatch.length} photos (${filteredAssets.length} total available)');
-
       // Load thumbnails for first batch (for smooth UX)
       final int initialBatchSize = 10;
       List<PhotoModel> loadedPhotos = [];
 
-      for (int i = 0; i < currentBatch.length && i < initialBatchSize; i++) {
-        final asset = currentBatch[i];
+      for (int i = 0; i < filteredAssets.length && i < initialBatchSize; i++) {
+        final asset = filteredAssets[i];
         final thumbnail = await asset.thumbnailDataWithSize(
           const ThumbnailSize(800, 800),
           quality: 85,
@@ -211,7 +190,7 @@ class PhotoProvider extends ChangeNotifier {
       debugPrint('Initial batch loaded: ${_photos.length} photos');
 
       // Load remaining thumbnails in background
-      _loadRemainingPhotos(currentBatch, initialBatchSize);
+      _loadRemainingPhotos(filteredAssets, initialBatchSize);
     } catch (e) {
       _errorMessage = e.toString();
       _isLoading = false;
@@ -259,75 +238,9 @@ class PhotoProvider extends ChangeNotifier {
   }
 
   /// Move to next photo (called after swipe)
-  /// Triggers auto-load when approaching the end of current batch
   void nextPhoto() {
     if (_currentIndex < _photos.length) {
       _currentIndex++;
-      notifyListeners();
-      
-      // Auto-load when near threshold and more batches available
-      if (remainingCount <= AppConstants.autoLoadThreshold && hasMoreToLoad && !_isLoadingMore) {
-        debugPrint('Auto-load triggered! Remaining: $remainingCount, Threshold: ${AppConstants.autoLoadThreshold}');
-        _loadNextBatch();
-      }
-    }
-  }
-
-  /// Load next batch of photos automatically
-  Future<void> _loadNextBatch() async {
-    if (_isLoadingMore || !hasMoreToLoad) return;
-    
-    _isLoadingMore = true;
-    notifyListeners();
-    
-    try {
-      _currentBatchStart += AppConstants.maxPhotosToLoad;
-      
-      int endIndex = _currentBatchStart + AppConstants.maxPhotosToLoad;
-      if (endIndex > _filteredAssets.length) {
-        endIndex = _filteredAssets.length;
-      }
-      
-      List<AssetEntity> nextBatch = _filteredAssets.sublist(_currentBatchStart, endIndex);
-      
-      debugPrint('Auto-loading next batch: ${nextBatch.length} photos (starting at $_currentBatchStart)');
-      
-      for (int i = 0; i < nextBatch.length; i++) {
-        final asset = nextBatch[i];
-        
-        try {
-          final thumbnail = await asset.thumbnailDataWithSize(
-            const ThumbnailSize(800, 800),
-            quality: 85,
-          );
-          
-          _photos.add(PhotoModel(
-            id: asset.id,
-            createDate: asset.createDateTime,
-            modifyDate: asset.modifiedDateTime,
-            width: asset.width,
-            height: asset.height,
-            type: asset.type == AssetType.video ? PhotoType.video : PhotoType.image,
-            duration: asset.type == AssetType.video ? asset.duration : null,
-            thumbnail: thumbnail,
-          ));
-          
-          // Update UI every 5 photos (more frequent for testing)
-          if (i % 5 == 0) {
-            notifyListeners();
-            debugPrint('Batch progress: ${i + 1}/${nextBatch.length} loaded');
-          }
-        } catch (e) {
-          debugPrint('Error loading photo in next batch: $e');
-        }
-      }
-      
-      _isLoadingMore = false;
-      notifyListeners();
-      debugPrint('Auto-load complete. Total photos now: ${_photos.length}');
-    } catch (e) {
-      debugPrint('Error loading next batch: $e');
-      _isLoadingMore = false;
       notifyListeners();
     }
   }
@@ -348,11 +261,8 @@ class PhotoProvider extends ChangeNotifier {
     nextPhoto();
   }
 
-  /// Swipe left - goes to dumpbox AND mark as reviewed
-  Future<void> swipeLeft() async {
-    if (currentPhoto != null) {
-      await markAsReviewed(currentPhoto!.id);
-    }
+  /// Swipe left - goes to dumpbox (don't mark as reviewed)
+  void swipeLeft() {
     nextPhoto();
   }
 
@@ -360,9 +270,6 @@ class PhotoProvider extends ChangeNotifier {
   void reset() {
     _currentIndex = 0;
     _photos = [];
-    _filteredAssets = [];
-    _currentBatchStart = 0;
-    _isLoadingMore = false;
     _errorMessage = null;
     notifyListeners();
   }
