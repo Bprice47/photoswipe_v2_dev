@@ -72,6 +72,8 @@ class SessionModel {
     switch (filterType) {
       case FilterType.mostRecent:
         return AppConstants.categoryMostRecent;
+      case FilterType.allPhotos:
+        return AppConstants.categoryAllPhotos;
       case FilterType.oldest:
         return AppConstants.categoryOldest;
       case FilterType.videos:
