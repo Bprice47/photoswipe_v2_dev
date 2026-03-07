@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:intl/intl.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../config/routes.dart';
-import '../widgets/date_picker_button.dart';
 
 /// Screen 4: Date Range Screen
 /// Allow user to filter photos by date range
@@ -18,40 +18,78 @@ class _DateRangeScreenState extends State<DateRangeScreen> {
   DateTime? _startDate;
   DateTime? _endDate;
 
-  /// Show date picker dialog
-  Future<void> _selectDate(bool isStartDate) async {
-    final DateTime? picked = await showDatePicker(
+  /// Show iOS-style wheel date picker
+  void _selectDate(bool isStartDate) {
+    DateTime initialDate = isStartDate 
+        ? (_startDate ?? DateTime.now()) 
+        : (_endDate ?? DateTime.now());
+
+    showCupertinoModalPopup(
       context: context,
-      initialDate: isStartDate 
-          ? (_startDate ?? DateTime.now()) 
-          : (_endDate ?? DateTime.now()),
-      firstDate: DateTime(2000),
-      lastDate: DateTime.now(),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: AppTheme.accentPrimary,
-              onPrimary: AppTheme.textPrimary,
-              surface: AppTheme.backgroundCard,
-              onSurface: AppTheme.textPrimary,
-            ),
-            dialogBackgroundColor: AppTheme.backgroundCard,
+      builder: (BuildContext context) {
+        DateTime tempDate = initialDate;
+        return Container(
+          height: 300,
+          color: AppTheme.backgroundCard,
+          child: Column(
+            children: [
+              // Header with Done button
+              Container(
+                height: 50,
+                color: AppTheme.backgroundCardAlt,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    CupertinoButton(
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(color: AppTheme.textSecondary),
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    Text(
+                      isStartDate ? 'Start Date' : 'End Date',
+                      style: AppTheme.h3,
+                    ),
+                    CupertinoButton(
+                      child: Text(
+                        'Done',
+                        style: TextStyle(
+                          color: AppTheme.accentPrimary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          if (isStartDate) {
+                            _startDate = tempDate;
+                          } else {
+                            _endDate = tempDate;
+                          }
+                        });
+                        Navigator.pop(context);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              // Date Picker Wheel
+              Expanded(
+                child: CupertinoDatePicker(
+                  mode: CupertinoDatePickerMode.date,
+                  initialDateTime: initialDate,
+                  minimumDate: DateTime(2000),
+                  maximumDate: DateTime.now(),
+                  onDateTimeChanged: (DateTime newDate) {
+                    tempDate = newDate;
+                  },
+                ),
+              ),
+            ],
           ),
-          child: child!,
         );
       },
     );
-
-    if (picked != null) {
-      setState(() {
-        if (isStartDate) {
-          _startDate = picked;
-        } else {
-          _endDate = picked;
-        }
-      });
-    }
   }
 
   /// Navigate to swipe screen with date filter
@@ -65,6 +103,12 @@ class _DateRangeScreenState extends State<DateRangeScreen> {
         'endDate': _endDate,
       },
     );
+  }
+
+  /// Format date for display
+  String _formatDate(DateTime? date) {
+    if (date == null) return 'Tap to select';
+    return DateFormat('MMMM d, yyyy').format(date);
   }
 
   @override
@@ -96,22 +140,18 @@ class _DateRangeScreenState extends State<DateRangeScreen> {
                 style: AppTheme.h2,
               ),
               
-              const SizedBox(height: AppTheme.spacingLg),
-              
-              // Instructions
-              Text(
-                'You can choose:',
-                style: AppTheme.body,
-              ),
               const SizedBox(height: AppTheme.spacingSm),
-              _buildInstruction('Start date only (from that date onward)'),
-              _buildInstruction('End date only (up to that date)'),
-              _buildInstruction('Both start and end (between the two)'),
+              
+              // Subtitle
+              Text(
+                'Photos will show oldest to newest',
+                style: AppTheme.caption,
+              ),
               
               const SizedBox(height: AppTheme.spacingXl),
               
               // Start Date Button
-              DatePickerButton(
+              _buildDateButton(
                 label: 'Start Date',
                 date: _startDate,
                 onTap: () => _selectDate(true),
@@ -120,11 +160,28 @@ class _DateRangeScreenState extends State<DateRangeScreen> {
               const SizedBox(height: AppTheme.spacingMd),
               
               // End Date Button
-              DatePickerButton(
+              _buildDateButton(
                 label: 'End Date',
                 date: _endDate,
                 onTap: () => _selectDate(false),
               ),
+              
+              const SizedBox(height: AppTheme.spacingMd),
+              
+              // Clear dates button
+              if (_startDate != null || _endDate != null)
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _startDate = null;
+                      _endDate = null;
+                    });
+                  },
+                  child: Text(
+                    'Clear Dates',
+                    style: TextStyle(color: AppTheme.textSecondary),
+                  ),
+                ),
               
               const Spacer(),
               
@@ -157,33 +214,55 @@ class _DateRangeScreenState extends State<DateRangeScreen> {
     );
   }
 
-  /// Build instruction bullet point
-  Widget _buildInstruction(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(
-        left: AppTheme.spacingSm,
-        bottom: AppTheme.spacingXs,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            margin: const EdgeInsets.only(top: 8),
-            width: 5,
-            height: 5,
-            decoration: const BoxDecoration(
-              color: AppTheme.textSecondary,
-              shape: BoxShape.circle,
-            ),
+  /// Build a date picker button
+  Widget _buildDateButton({
+    required String label,
+    required DateTime? date,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppTheme.spacingMd),
+        decoration: BoxDecoration(
+          color: AppTheme.backgroundCard,
+          borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+          border: Border.all(
+            color: date != null 
+                ? AppTheme.accentPrimary.withOpacity(0.5)
+                : AppTheme.textMuted.withOpacity(0.3),
           ),
-          const SizedBox(width: AppTheme.spacingSm),
-          Expanded(
-            child: Text(
-              text,
-              style: AppTheme.caption,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.calendar_today,
+              color: date != null ? AppTheme.accentPrimary : AppTheme.textMuted,
             ),
-          ),
-        ],
+            const SizedBox(width: AppTheme.spacingMd),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: AppTheme.caption,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _formatDate(date),
+                    style: date != null ? AppTheme.body : AppTheme.bodySecondary,
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: AppTheme.textMuted,
+            ),
+          ],
+        ),
       ),
     );
   }

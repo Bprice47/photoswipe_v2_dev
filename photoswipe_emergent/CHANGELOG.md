@@ -4,12 +4,16 @@
 
 ---
 
-### v1.5 - Oldest Filter Fix (March 6, 2026)
+### v1.5 - Oldest Filter Fix + Date Picker UI (March 6, 2026)
 **Status: STABLE**
 
 **Fixed:**
 - [x] "Oldest" now shows ALL photos including previously reviewed ones
 - [x] You can now see your actual oldest photo in the library
+- [x] Date Range picker now uses iOS wheel-style interface
+- [x] Date Range shows photos oldest → newest (start date forward)
+- [x] Added "Clear Dates" button
+- [x] Shows "Photos will show oldest to newest" hint
 
 **What's Working:**
 - Most Recent (skips reviewed photos)
