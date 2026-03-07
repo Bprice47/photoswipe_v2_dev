@@ -5,6 +5,7 @@ import '../config/routes.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/privacy_card.dart';
 import '../widgets/custom_checkbox.dart';
+import '../services/permission_service.dart';
 
 /// Screen 1: Welcome Screen - Shows EVERY time for legal protection
 class WelcomeScreen extends StatefulWidget {
@@ -16,11 +17,25 @@ class WelcomeScreen extends StatefulWidget {
 
 class _WelcomeScreenState extends State<WelcomeScreen> {
   bool _hasAgreed = false;
+  final _permissionService = PermissionService.instance;
 
-  void _onContinue() {
+  void _onContinue() async {
     if (!_hasAgreed) return;
-    // Go to permission screen to request photo access
-    AppRoutes.navigateTo(context, AppRoutes.permission);
+    
+    // Check if we already have photo permission
+    final state = await _permissionService.checkPermission();
+    
+    if (_permissionService.hasAccess) {
+      // Already have permission, go straight to category
+      if (mounted) {
+        AppRoutes.navigateAndClear(context, AppRoutes.category);
+      }
+    } else {
+      // Need to request permission
+      if (mounted) {
+        AppRoutes.navigateTo(context, AppRoutes.permission);
+      }
+    }
   }
 
   @override
