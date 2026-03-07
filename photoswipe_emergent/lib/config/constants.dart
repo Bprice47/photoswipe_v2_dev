@@ -22,8 +22,11 @@ class AppConstants {
   /// Number of photos to load per page
   static const int photosPerPage = 500;
 
-  /// Maximum photos to load to prevent memory crash (1000 is safe for most iPhones)
-  static const int maxPhotosToLoad = 1000;
+  /// Maximum photos to load per batch (set to 20 for testing, change to 1000 for production)
+  static const int maxPhotosToLoad = 20;
+
+  /// When to trigger auto-load (photos remaining before loading next batch)
+  static const int autoLoadThreshold = 5;
 
   /// Thumbnail size for swipe cards
   static const int thumbnailSize = 800;

@@ -265,8 +265,9 @@ class PhotoProvider extends ChangeNotifier {
       _currentIndex++;
       notifyListeners();
       
-      // Auto-load when 100 photos remaining and more batches available
-      if (remainingCount <= 100 && hasMoreToLoad && !_isLoadingMore) {
+      // Auto-load when near threshold and more batches available
+      if (remainingCount <= AppConstants.autoLoadThreshold && hasMoreToLoad && !_isLoadingMore) {
+        debugPrint('Auto-load triggered! Remaining: $remainingCount, Threshold: ${AppConstants.autoLoadThreshold}');
         _loadNextBatch();
       }
     }
