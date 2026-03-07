@@ -164,14 +164,6 @@ class PhotoProvider extends ChangeNotifier {
         filteredAssets.add(asset);
       }
 
-        // Skip reviewed photos for mostRecent, oldest, videos, resume
-        if (skipReviewed && _reviewedPhotoIds.contains(asset.id)) {
-          continue;
-        }
-
-        filteredAssets.add(asset);
-      }
-
       debugPrint('Filtered to ${filteredAssets.length} assets');
 
       // Store filtered assets for auto-load functionality

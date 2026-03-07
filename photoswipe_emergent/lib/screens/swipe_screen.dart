@@ -146,37 +146,12 @@ class _SwipeScreenState extends State<SwipeScreen> {
                   const SizedBox(height: AppTheme.spacingMd),
 
                   // Progress Indicator
-                  Column(
-                    children: [
-                      Text(
-                        'Photo ${photoProvider.currentIndex + 1} of ${photoProvider.photos.length}',
-                        style: AppTheme.body,
-                      ),
-                      if (photoProvider.hasMoreToLoad) 
-                        Text(
-                          '(${photoProvider.totalFilteredCount} total available)',
-                          style: AppTheme.caption,
-                        ),
-                      if (photoProvider.isLoadingMore) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                              width: 12,
-                              height: 12,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: AppTheme.accentPrimary,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text('Loading more...', style: AppTheme.caption),
-                          ],
-                        ),
-                      ],
-                    ],
+                  Text(
+                    'Photo ${photoProvider.currentIndex + 1} of ${photoProvider.photos.length}',
+                    style: AppTheme.body,
                   ),
+                  if (photoProvider.isLoadingMore)
+                    Text('Loading more...', style: AppTheme.caption),
 
                   const SizedBox(height: AppTheme.spacingMd),
 
