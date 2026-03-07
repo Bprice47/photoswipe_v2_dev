@@ -69,6 +69,18 @@ class CategoryScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: AppTheme.spacingMd),
 
+                    // All Photos (re-review everything)
+                    CategoryTile(
+                      icon: Icons.photo_library,
+                      title: AppConstants.categoryAllPhotos,
+                      subtitle: AppConstants.categoryAllPhotosDesc,
+                      onTap: () => _navigateToSwipe(
+                        context,
+                        FilterType.allPhotos,
+                      ),
+                    ),
+                    const SizedBox(height: AppTheme.spacingMd),
+
                     // Oldest
                     CategoryTile(
                       icon: Icons.history,
