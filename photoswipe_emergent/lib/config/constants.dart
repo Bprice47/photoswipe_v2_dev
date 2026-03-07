@@ -22,11 +22,8 @@ class AppConstants {
   /// Number of photos to load per page
   static const int photosPerPage = 500;
 
-  /// Maximum photos to load per batch (20 for testing, 1000 for production)
-  static const int maxPhotosToLoad = 20;
-
-  /// When to trigger auto-load (photos remaining before loading next batch)
-  static const int autoLoadThreshold = 5;
+  /// Maximum photos to load to prevent memory crash (1000 is safe for most iPhones)
+  static const int maxPhotosToLoad = 1000;
 
   /// Thumbnail size for swipe cards
   static const int thumbnailSize = 800;
@@ -143,14 +140,13 @@ Note: Deleted photos are permanently removed and won\'t appear in either option.
 }
 
 /// Filter types for photo loading
-/// NOTE: Only add new types at the END to avoid breaking saved sessions
 enum FilterType {
-  mostRecent,  // Skip reviewed, newest first
-  oldest,      // Skip reviewed, oldest first  
-  videos,      // Skip reviewed, videos only
-  dateRange,   // Custom date range
-  resume,      // Continue from last position
-  allPhotos,   // Show ALL photos including reviewed (for re-reviewing)
+  mostRecent,    // Skip reviewed photos, newest first
+  allPhotos,     // Show ALL photos (including reviewed), newest first
+  oldest,        // Skip reviewed photos, oldest first
+  videos,        // Skip reviewed videos, newest first
+  dateRange,     // Custom date range, oldest first (start date forward)
+  resume,        // Continue from where user left off
 }
 
 /// Sort order for photos

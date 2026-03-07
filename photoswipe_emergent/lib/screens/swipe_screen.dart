@@ -145,13 +145,11 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
                   const SizedBox(height: AppTheme.spacingMd),
 
-                  // Progress Indicator
+                  // Remaining Count + Total
                   Text(
-                    'Photo ${photoProvider.currentIndex + 1} of ${photoProvider.photos.length}',
+                    '${photoProvider.remainingCount} remaining (${photoProvider.photos.length} loaded)',
                     style: AppTheme.body,
                   ),
-                  if (photoProvider.isLoadingMore)
-                    Text('Loading more...', style: AppTheme.caption),
 
                   const SizedBox(height: AppTheme.spacingMd),
 

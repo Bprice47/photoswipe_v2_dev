@@ -142,12 +142,11 @@ class PhotoProvider extends ChangeNotifier {
         _allAssets.sort((a, b) => b.createDateTime.compareTo(a.createDateTime));
       }
 
-      // Determine which filters should skip reviewed photos
-      // allPhotos and dateRange show EVERYTHING; others skip reviewed
-      bool skipReviewed = _currentFilter == FilterType.mostRecent ||
-                          _currentFilter == FilterType.oldest ||
-                          _currentFilter == FilterType.videos ||
-                          _currentFilter == FilterType.resume;
+      // Determine if we should skip reviewed photos
+      // allPhotos, dateRange, and oldest show everything; others skip reviewed
+      bool skipReviewed = _currentFilter != FilterType.allPhotos && 
+                          _currentFilter != FilterType.dateRange &&
+                          _currentFilter != FilterType.oldest;
 
       // Filter assets based on criteria
       List<AssetEntity> filteredAssets = [];
@@ -267,9 +266,8 @@ class PhotoProvider extends ChangeNotifier {
       _currentIndex++;
       notifyListeners();
       
-      // Auto-load when near threshold and more batches available
-      if (remainingCount <= AppConstants.autoLoadThreshold && hasMoreToLoad && !_isLoadingMore) {
-        debugPrint('Auto-load triggered! Remaining: $remainingCount');
+      // Auto-load when 100 photos remaining and more batches available
+      if (remainingCount <= 100 && hasMoreToLoad && !_isLoadingMore) {
         _loadNextBatch();
       }
     }
