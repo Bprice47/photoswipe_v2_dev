@@ -69,11 +69,6 @@ class _SwipeScreenState extends State<SwipeScreen> {
       PhotoProvider photoProvider, DumpBoxProvider dumpBoxProvider) {
     final currentPhoto = photoProvider.currentPhoto;
     if (currentPhoto != null) {
-      // Check if dumpbox is full
-      if (dumpBoxProvider.isFull) {
-        _showDumpboxFullDialog(dumpBoxProvider);
-        return;
-      }
       dumpBoxProvider.addPhoto(currentPhoto);
     }
     _swiperController.swipe(CardSwiperDirection.left);
@@ -81,72 +76,6 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
   void _onSwipeRight(PhotoProvider photoProvider) {
     _swiperController.swipe(CardSwiperDirection.right);
-  }
-
-  /// Show dialog when dumpbox is full
-  void _showDumpboxFullDialog(DumpBoxProvider dumpBoxProvider) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.backgroundCard,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-        ),
-        title: Row(
-          children: [
-            Icon(Icons.inbox, color: AppTheme.accentPrimary),
-            const SizedBox(width: AppTheme.spacingSm),
-            Text('DumpBox Full!', style: AppTheme.h3),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'You have ${AppConstants.maxDumpBoxPhotos} photos waiting to be reviewed.',
-              style: AppTheme.body,
-            ),
-            const SizedBox(height: AppTheme.spacingMd),
-            Text(
-              'Let\'s review and delete them before continuing!',
-              style: AppTheme.bodySecondary,
-            ),
-            // Show ad placeholder for non-subscribers
-            if (!dumpBoxProvider.isSubscriber) ...[
-              const SizedBox(height: AppTheme.spacingLg),
-              Container(
-                height: 60,
-                decoration: BoxDecoration(
-                  color: AppTheme.backgroundCardAlt,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
-                  border: Border.all(color: AppTheme.textMuted.withOpacity(0.3)),
-                ),
-                child: Center(
-                  child: Text(
-                    '[ Ad Placeholder ]',
-                    style: AppTheme.caption,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              AppRoutes.navigateTo(context, AppRoutes.dumpbox);
-            },
-            child: Text(
-              'Review DumpBox',
-              style: TextStyle(color: AppTheme.accentPrimary, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   bool _onSwipe(
@@ -159,12 +88,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
         Provider.of<DumpBoxProvider>(context, listen: false);
 
     if (direction == CardSwiperDirection.left) {
-      // Check if dumpbox is full before adding
-      if (dumpBoxProvider.isFull) {
-        _showDumpboxFullDialog(dumpBoxProvider);
-        return false; // Prevent the swipe
-      }
-      // Swiped left - add to dumpbox
+      // Swiped left - add to dumpbox (not marked as reviewed)
       final photo = photoProvider.photos[previousIndex];
       dumpBoxProvider.addPhoto(photo);
       photoProvider.swipeLeft();
@@ -179,58 +103,6 @@ class _SwipeScreenState extends State<SwipeScreen> {
   void _onUndo(DumpBoxProvider dumpBoxProvider) {
     _swiperController.undo();
     dumpBoxProvider.removeLastPhoto();
-  }
-
-  /// Build the progress indicator with auto-load status
-  Widget _buildProgressIndicator(PhotoProvider photoProvider) {
-    final currentPosition = photoProvider.currentIndex + 1;
-    final loadedCount = photoProvider.photos.length;
-    final totalAvailable = photoProvider.totalFilteredCount;
-    final isLoadingMore = photoProvider.isLoadingMore;
-    final hasMore = photoProvider.hasMoreToLoad;
-
-    return Column(
-      children: [
-        // Main progress text
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'Photo $currentPosition of $loadedCount',
-              style: AppTheme.body,
-            ),
-            if (hasMore || totalAvailable > loadedCount) ...[
-              Text(
-                ' ($totalAvailable total)',
-                style: AppTheme.caption,
-              ),
-            ],
-          ],
-        ),
-        // Auto-loading indicator
-        if (isLoadingMore) ...[
-          const SizedBox(height: AppTheme.spacingXs),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(
-                width: 12,
-                height: 12,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppTheme.accentPrimary,
-                ),
-              ),
-              const SizedBox(width: AppTheme.spacingXs),
-              Text(
-                'Loading more photos...',
-                style: AppTheme.caption,
-              ),
-            ],
-          ),
-        ],
-      ],
-    );
   }
 
   @override
@@ -274,7 +146,37 @@ class _SwipeScreenState extends State<SwipeScreen> {
                   const SizedBox(height: AppTheme.spacingMd),
 
                   // Progress Indicator
-                  _buildProgressIndicator(photoProvider),
+                  Column(
+                    children: [
+                      Text(
+                        'Photo ${photoProvider.currentIndex + 1} of ${photoProvider.photos.length}',
+                        style: AppTheme.body,
+                      ),
+                      if (photoProvider.hasMoreToLoad) 
+                        Text(
+                          '(${photoProvider.totalFilteredCount} total available)',
+                          style: AppTheme.caption,
+                        ),
+                      if (photoProvider.isLoadingMore) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppTheme.accentPrimary,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text('Loading more...', style: AppTheme.caption),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
 
                   const SizedBox(height: AppTheme.spacingMd),
 

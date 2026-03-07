@@ -22,14 +22,11 @@ class AppConstants {
   /// Number of photos to load per page
   static const int photosPerPage = 500;
 
-  /// Maximum photos to load per batch (set to 20 for testing, change to 1000 for production)
+  /// Maximum photos to load per batch (20 for testing, 1000 for production)
   static const int maxPhotosToLoad = 20;
 
   /// When to trigger auto-load (photos remaining before loading next batch)
   static const int autoLoadThreshold = 5;
-
-  /// Maximum photos in dumpbox before requiring review
-  static const int maxDumpBoxPhotos = 30;
 
   /// Thumbnail size for swipe cards
   static const int thumbnailSize = 800;
@@ -147,12 +144,11 @@ Note: Deleted photos are permanently removed and won\'t appear in either option.
 
 /// Filter types for photo loading
 enum FilterType {
-  mostRecent,    // Skip reviewed photos, newest first
-  allPhotos,     // Show ALL photos (including reviewed), newest first
-  oldest,        // Skip reviewed photos, oldest first
-  videos,        // Skip reviewed videos, newest first
-  dateRange,     // Custom date range, oldest first (start date forward)
-  resume,        // Continue from where user left off
+  mostRecent,
+  oldest,
+  videos,
+  dateRange,
+  resume,
 }
 
 /// Sort order for photos

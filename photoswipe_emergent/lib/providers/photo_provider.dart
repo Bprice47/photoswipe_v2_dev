@@ -138,14 +138,9 @@ class PhotoProvider extends ChangeNotifier {
       if (_currentFilter == FilterType.oldest || _currentFilter == FilterType.dateRange) {
         _allAssets.sort((a, b) => a.createDateTime.compareTo(b.createDateTime));
       } else {
-        // Most recent, allPhotos, videos, resume (default - newest first)
+        // Most recent, videos, resume (default - newest first)
         _allAssets.sort((a, b) => b.createDateTime.compareTo(a.createDateTime));
       }
-
-      // Determine if we should skip reviewed photos
-      // allPhotos and dateRange show everything; others skip reviewed
-      bool skipReviewed = _currentFilter != FilterType.allPhotos && 
-                          _currentFilter != FilterType.dateRange;
 
       // Filter assets based on criteria
       List<AssetEntity> filteredAssets = [];
@@ -158,6 +153,16 @@ class PhotoProvider extends ChangeNotifier {
         if (_endDate != null && asset.createDateTime.isAfter(_endDate!)) {
           continue;
         }
+
+        // For Resume Session: skip already reviewed photos
+        if (_currentFilter == FilterType.resume) {
+          if (_reviewedPhotoIds.contains(asset.id)) {
+            continue;
+          }
+        }
+
+        filteredAssets.add(asset);
+      }
 
         // Skip reviewed photos for mostRecent, oldest, videos, resume
         if (skipReviewed && _reviewedPhotoIds.contains(asset.id)) {
@@ -267,7 +272,7 @@ class PhotoProvider extends ChangeNotifier {
       
       // Auto-load when near threshold and more batches available
       if (remainingCount <= AppConstants.autoLoadThreshold && hasMoreToLoad && !_isLoadingMore) {
-        debugPrint('Auto-load triggered! Remaining: $remainingCount, Threshold: ${AppConstants.autoLoadThreshold}');
+        debugPrint('Auto-load triggered! Remaining: $remainingCount');
         _loadNextBatch();
       }
     }

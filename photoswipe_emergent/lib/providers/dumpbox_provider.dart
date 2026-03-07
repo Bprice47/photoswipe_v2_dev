@@ -1,12 +1,10 @@
 import 'package:flutter/foundation.dart';
 import '../models/photo_model.dart';
-import '../config/constants.dart';
 
 /// Provider for managing the DumpBox (photos marked for deletion)
 class DumpBoxProvider extends ChangeNotifier {
   final List<PhotoModel> _dumpBoxPhotos = [];
   final Set<String> _selectedIds = {};
-  bool _isSubscriber = false; // Placeholder for subscription status
 
   // Getters
   List<PhotoModel> get photos => _dumpBoxPhotos;
@@ -15,31 +13,14 @@ class DumpBoxProvider extends ChangeNotifier {
   int get selectedCount => _selectedIds.length;
   bool get hasPhotos => _dumpBoxPhotos.isNotEmpty;
   bool get allSelected => _selectedIds.length == _dumpBoxPhotos.length;
-  bool get isSubscriber => _isSubscriber;
-  bool get isFull => _dumpBoxPhotos.length >= AppConstants.maxDumpBoxPhotos;
-  int get remainingSlots => AppConstants.maxDumpBoxPhotos - _dumpBoxPhotos.length;
-
-  /// Set subscriber status (placeholder for future implementation)
-  void setSubscriberStatus(bool status) {
-    _isSubscriber = status;
-    notifyListeners();
-  }
 
   /// Add a photo to DumpBox (swiped left)
-  /// Returns false if dumpbox is full
-  bool addPhoto(PhotoModel photo) {
-    if (_dumpBoxPhotos.any((p) => p.id == photo.id)) {
-      return true; // Already exists
+  void addPhoto(PhotoModel photo) {
+    if (!_dumpBoxPhotos.any((p) => p.id == photo.id)) {
+      _dumpBoxPhotos.add(photo);
+      _selectedIds.add(photo.id); // Auto-select new additions
+      notifyListeners();
     }
-    
-    if (isFull) {
-      return false; // Dumpbox is full
-    }
-    
-    _dumpBoxPhotos.add(photo);
-    _selectedIds.add(photo.id); // Auto-select new additions
-    notifyListeners();
-    return true;
   }
 
   /// Remove a photo from DumpBox (restored)
