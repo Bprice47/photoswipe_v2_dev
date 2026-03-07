@@ -19,7 +19,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   void _onContinue() {
     if (!_hasAgreed) return;
-    AppRoutes.navigateTo(context, AppRoutes.category);
+    // Go to permission screen to request photo access
+    AppRoutes.navigateTo(context, AppRoutes.permission);
   }
 
   @override

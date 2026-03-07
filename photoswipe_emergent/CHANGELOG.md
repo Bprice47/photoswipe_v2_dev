@@ -4,7 +4,7 @@
 
 ---
 
-### v1.5 - Oldest Filter Fix + Date Picker UI (March 6, 2026)
+### v1.5 - Oldest Filter Fix + Date Picker UI + Permission Fix (March 6, 2026)
 **Status: STABLE**
 
 **Fixed:**
@@ -12,8 +12,11 @@
 - [x] You can now see your actual oldest photo in the library
 - [x] Date Range picker now uses iOS wheel-style interface
 - [x] Date Range shows photos oldest → newest (start date forward)
+- [x] Start date picker defaults to oldest photo in library
+- [x] End date picker defaults to selected start date
 - [x] Added "Clear Dates" button
-- [x] Shows "Photos will show oldest to newest" hint
+- [x] Shows "Oldest photo: [date]" hint
+- [x] **Permission popup now shows** - app goes to permission screen after welcome
 
 **What's Working:**
 - Most Recent (skips reviewed photos)
