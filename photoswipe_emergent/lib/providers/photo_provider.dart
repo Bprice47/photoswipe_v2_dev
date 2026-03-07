@@ -125,13 +125,16 @@ class PhotoProvider extends ChangeNotifier {
 
       debugPrint('Total photos in library: $_totalCount');
 
-      // Fetch ALL photo references (fast - no thumbnails yet)
-      _allAssets = await recentAlbum.getAssetListRange(
-        start: 0,
-        end: _totalCount,
-      );
-
-      debugPrint('Fetched ${_allAssets.length} asset references');
+      // Only re-fetch assets if count changed (new photos added/deleted)
+      if (_allAssets.isEmpty || _allAssets.length != _totalCount) {
+        _allAssets = await recentAlbum.getAssetListRange(
+          start: 0,
+          end: _totalCount,
+        );
+        debugPrint('Fetched ${_allAssets.length} asset references');
+      } else {
+        debugPrint('Using cached ${_allAssets.length} asset references');
+      }
 
       // Sort based on filter type FIRST
       // Custom date range sorts oldest first (start date forward)
