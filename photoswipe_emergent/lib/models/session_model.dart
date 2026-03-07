@@ -80,6 +80,8 @@ class SessionModel {
         return AppConstants.categoryDateRange;
       case FilterType.resume:
         return AppConstants.categoryResume;
+      case FilterType.allPhotos:
+        return AppConstants.categoryAllPhotos;
     }
   }
 

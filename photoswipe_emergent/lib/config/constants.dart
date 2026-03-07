@@ -143,12 +143,14 @@ Note: Deleted photos are permanently removed and won\'t appear in either option.
 }
 
 /// Filter types for photo loading
+/// NOTE: Only add new types at the END to avoid breaking saved sessions
 enum FilterType {
-  mostRecent,
-  oldest,
-  videos,
-  dateRange,
-  resume,
+  mostRecent,  // Skip reviewed, newest first
+  oldest,      // Skip reviewed, oldest first  
+  videos,      // Skip reviewed, videos only
+  dateRange,   // Custom date range
+  resume,      // Continue from last position
+  allPhotos,   // Show ALL photos including reviewed (for re-reviewing)
 }
 
 /// Sort order for photos

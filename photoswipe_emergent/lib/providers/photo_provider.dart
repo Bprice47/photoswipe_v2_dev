@@ -138,9 +138,16 @@ class PhotoProvider extends ChangeNotifier {
       if (_currentFilter == FilterType.oldest || _currentFilter == FilterType.dateRange) {
         _allAssets.sort((a, b) => a.createDateTime.compareTo(b.createDateTime));
       } else {
-        // Most recent, videos, resume (default - newest first)
+        // Most recent, allPhotos, videos, resume (default - newest first)
         _allAssets.sort((a, b) => b.createDateTime.compareTo(a.createDateTime));
       }
+
+      // Determine which filters should skip reviewed photos
+      // allPhotos and dateRange show EVERYTHING; others skip reviewed
+      bool skipReviewed = _currentFilter == FilterType.mostRecent ||
+                          _currentFilter == FilterType.oldest ||
+                          _currentFilter == FilterType.videos ||
+                          _currentFilter == FilterType.resume;
 
       // Filter assets based on criteria
       List<AssetEntity> filteredAssets = [];
@@ -154,11 +161,9 @@ class PhotoProvider extends ChangeNotifier {
           continue;
         }
 
-        // For Resume Session: skip already reviewed photos
-        if (_currentFilter == FilterType.resume) {
-          if (_reviewedPhotoIds.contains(asset.id)) {
-            continue;
-          }
+        // Skip reviewed photos for mostRecent, oldest, videos, resume
+        if (skipReviewed && _reviewedPhotoIds.contains(asset.id)) {
+          continue;
         }
 
         filteredAssets.add(asset);
