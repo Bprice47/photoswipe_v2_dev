@@ -28,6 +28,9 @@ class AppConstants {
   /// When to trigger auto-load (photos remaining before loading next batch)
   static const int autoLoadThreshold = 5;
 
+  /// Maximum photos in dumpbox before requiring review
+  static const int maxDumpBoxPhotos = 30;
+
   /// Thumbnail size for swipe cards
   static const int thumbnailSize = 800;
 
