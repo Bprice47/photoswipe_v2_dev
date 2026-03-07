@@ -191,8 +191,8 @@ class PhotoProvider extends ChangeNotifier {
       for (int i = 0; i < currentBatch.length && i < initialBatchSize; i++) {
         final asset = currentBatch[i];
         final thumbnail = await asset.thumbnailDataWithSize(
-          const ThumbnailSize(800, 800),
-          quality: 85,
+          const ThumbnailSize(400, 400),  // Smaller = faster
+          quality: 70,  // Lower quality = faster
         );
 
         loadedPhotos.add(PhotoModel(
@@ -232,8 +232,8 @@ class PhotoProvider extends ChangeNotifier {
 
       try {
         final thumbnail = await asset.thumbnailDataWithSize(
-          const ThumbnailSize(800, 800),
-          quality: 85,
+          const ThumbnailSize(400, 400),  // Smaller = faster
+          quality: 70,  // Lower quality = faster
         );
 
         _photos.add(PhotoModel(
@@ -248,10 +248,9 @@ class PhotoProvider extends ChangeNotifier {
           thumbnail: thumbnail,
         ));
 
-        // Update UI every 20 photos
-        if (i % 20 == 0) {
+        // Update UI every 5 photos (faster feedback)
+        if (i % 5 == 0) {
           notifyListeners();
-          debugPrint('Loaded ${_photos.length} photos...');
         }
       } catch (e) {
         debugPrint('Error loading photo $i: $e');
@@ -301,8 +300,8 @@ class PhotoProvider extends ChangeNotifier {
         
         try {
           final thumbnail = await asset.thumbnailDataWithSize(
-            const ThumbnailSize(800, 800),
-            quality: 85,
+            const ThumbnailSize(400, 400),  // Smaller = faster
+            quality: 70,  // Lower quality = faster
           );
           
           _photos.add(PhotoModel(
@@ -316,8 +315,8 @@ class PhotoProvider extends ChangeNotifier {
             thumbnail: thumbnail,
           ));
           
-          // Update UI every 20 photos
-          if (i % 20 == 0) {
+          // Update UI every 5 photos (faster feedback)
+          if (i % 5 == 0) {
             notifyListeners();
           }
         } catch (e) {
