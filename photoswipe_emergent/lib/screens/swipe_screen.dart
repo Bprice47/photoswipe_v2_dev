@@ -145,10 +145,29 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
                   const SizedBox(height: AppTheme.spacingMd),
 
-                  // Remaining Count + Total
-                  Text(
-                    '${photoProvider.remainingCount} remaining (${photoProvider.photos.length} loaded)',
-                    style: AppTheme.body,
+                  // Progress Counter: "Photo X of Y (Z total)"
+                  Column(
+                    children: [
+                      Text(
+                        'Photo ${photoProvider.currentIndex + 1} of ${photoProvider.photos.length}',
+                        style: AppTheme.body,
+                      ),
+                      Text(
+                        '(${photoProvider.totalFilteredCount} total in library)',
+                        style: AppTheme.caption,
+                      ),
+                      if (photoProvider.isLoadingMore)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Loading more...',
+                            style: TextStyle(
+                              color: AppTheme.accentPrimary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
 
                   const SizedBox(height: AppTheme.spacingMd),
