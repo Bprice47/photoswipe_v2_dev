@@ -4,6 +4,27 @@
 
 ---
 
+### v1.6 - Performance Optimization (December 2025)
+**Status: IN TESTING**
+
+**Fixed:**
+- [x] **Major performance fix**: App now loads much faster when returning after taking new photos
+- [x] Implemented incremental photo loading - only fetches NEW photos since last load
+- [x] Added persistent cache metadata using SharedPreferences
+- [x] Preserved in-memory asset cache across filter switches
+- [x] Optimized reset logic - soft reset keeps asset cache, full reset available when needed
+
+**How it works:**
+- First launch: Full fetch of all photos (one-time)
+- Subsequent launches: Checks photo count, only fetches new photos (< 100 new = incremental load)
+- Filter switches: Reuses cached assets, just re-filters and re-sorts
+
+**Technical changes:**
+- `photo_provider.dart`: Added `_assetsAreCached` flag and `_keyLastPhotoCount` persistent storage
+- `swipe_screen.dart`: Smart filter change detection - only resets when filter actually changes
+
+---
+
 ### v1.5 - Oldest Filter Fix + Date Picker UI (March 6, 2026)
 **Status: STABLE ✅ BACKUP VERSION**
 

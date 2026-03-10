@@ -53,6 +53,10 @@ class _SwipeScreenState extends State<SwipeScreen> {
       final endDate = widget.filterOptions!['endDate'] as DateTime?;
 
       if (filterType != null) {
+        // Only reset if filter changed
+        if (photoProvider.currentFilter != filterType) {
+          photoProvider.reset(); // Soft reset - keeps asset cache
+        }
         photoProvider.setFilter(
           type: filterType,
           startDate: startDate,
@@ -61,7 +65,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
       }
     }
 
-    // Load photos
+    // Load photos (will use cached assets if available)
     await photoProvider.loadPhotos();
   }
 

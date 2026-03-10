@@ -46,9 +46,18 @@ PhotoSwipe is a Flutter mobile app that allows users to clean their photo galler
 
 ## What's Been Implemented (as of Dec 2025)
 
-### Session 1 - Crash Fix
-- [x] Limited photo loading to 1000 to prevent memory crash
-- [x] Added `maxPhotosToLoad = 1000` constant
+### Session 3 - Performance Optimization (Dec 2025)
+- [x] **MAJOR FIX: Performance lag on app re-entry** - App now loads fast after taking new photos
+- [x] Implemented incremental photo loading - only fetches NEW photos since last load
+- [x] Added persistent cache metadata using SharedPreferences
+- [x] Preserved in-memory asset cache across filter switches
+- [x] Optimized reset logic - soft reset keeps asset cache, full reset available when needed
+
+**How the optimization works:**
+- First launch: Full fetch of all photos (one-time)
+- Subsequent launches: Checks photo count, only fetches new photos (< 100 new = incremental load)
+- Filter switches: Reuses cached assets, just re-filters and re-sorts
+- No more waiting 10+ seconds when returning to app after taking photos
 
 ### Session 2 - Feature Enhancements
 - [x] **Mark ALL swipes as reviewed** (both left and right)
@@ -64,11 +73,17 @@ PhotoSwipe is a Flutter mobile app that allows users to clean their photo galler
 - [x] Most Recent, Oldest, Videos now skip reviewed photos
 - [x] All Photos and Date Range show ALL photos
 
+### Session 1 - Crash Fix
+- [x] Limited photo loading to 1000 to prevent memory crash
+- [x] Added `maxPhotosToLoad = 1000` constant
+
 ---
 
 ## Upcoming Tasks (P0/P1)
 
-### P0 - Critical
+### P0 - Critical (In Progress)
+- [ ] **Fix UI Glitches on Swipe Screen** - Multiple overlapping progress counters/undo buttons
+- [ ] **Fix "Resume Last Session"** - Doesn't restore user's position correctly
 - [ ] Update tutorial/onboarding to explain:
   - "Most Recent" = only unreviewed photos
   - "All Photos" = start fresh (except deleted ones)
