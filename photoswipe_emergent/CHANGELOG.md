@@ -8,23 +8,22 @@
 **Status: IN TESTING**
 
 **Fixed:**
-- [x] **Major performance fix**: App now loads much faster when returning after taking new photos
-- [x] Implemented incremental photo loading - only fetches NEW photos since last load
-- [x] Added persistent cache metadata using SharedPreferences
-- [x] Preserved in-memory asset cache across filter switches
-- [x] **Fixed video loading** - cache now properly invalidates when switching between photos and videos
+- [x] **MAJOR PERFORMANCE FIX**: App now uses true pagination - only loads 200 photos at a time instead of all 10,000+
 - [x] **Removed "Resume Last Session"** - redundant feature (Most Recent already skips reviewed photos)
+- [x] Loading time should now be consistent regardless of library size
 
-**How it works:**
-- First launch: Full fetch of all photos (one-time)
-- Subsequent launches: Checks photo count, only fetches new photos (< 100 new = incremental load)
-- Filter switches: Reuses cached assets, just re-filters and re-sorts
-- Videos: Separate cache for video count, properly switches between photo/video mode
+**How it works now:**
+- Instead of fetching ALL 10,000+ photo references upfront, we now:
+  1. Fetch photos in batches of 200
+  2. Filter each batch (skip reviewed, apply date filters)
+  3. Stop when we have enough photos (20 for testing, 1000 for production)
+- This means: 10,000 photos or 100 photos = same fast load time!
 
 **Technical changes:**
-- `photo_provider.dart`: Added `_cachedFilterType` to track photo vs video cache
+- `photo_provider.dart`: Complete rewrite of `loadPhotos()` with true pagination
 - `constants.dart`: Removed `FilterType.resume` enum value
 - `category_screen.dart`: Removed Resume Last Session menu item
+- `session_model.dart`: Removed resume case from switch statement
 
 ---
 
