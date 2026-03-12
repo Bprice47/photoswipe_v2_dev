@@ -115,18 +115,6 @@ class CategoryScreen extends StatelessWidget {
                         AppRoutes.dateRange,
                       ),
                     ),
-                    const SizedBox(height: AppTheme.spacingMd),
-
-                    // Resume Last Session
-                    CategoryTile(
-                      icon: Icons.play_circle_outline,
-                      title: AppConstants.categoryResume,
-                      subtitle: AppConstants.categoryResumeDesc,
-                      onTap: () => _navigateToSwipe(
-                        context,
-                        FilterType.resume,
-                      ),
-                    ),
                   ],
                 ),
               ),

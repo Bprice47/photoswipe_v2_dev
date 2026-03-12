@@ -20,10 +20,9 @@ PhotoSwipe is a Flutter mobile app that allows users to clean their photo galler
 |----------|----------|------------|
 | Most Recent | Skip reviewed photos | Newest first |
 | All Photos | Show ALL photos (including reviewed) | Newest first |
-| Oldest | Skip reviewed photos | Oldest first |
-| Videos | Skip reviewed videos | Newest first |
+| Oldest | Show all photos | Oldest first |
+| Videos | Videos only | Newest first |
 | Custom Date Range | Show ALL in range | Oldest first (start date forward) |
-| Resume Last Session | Skip reviewed photos | Newest first |
 
 ### 3. DumpBox
 - Holds photos marked for deletion (swiped left)
@@ -51,13 +50,14 @@ PhotoSwipe is a Flutter mobile app that allows users to clean their photo galler
 - [x] Implemented incremental photo loading - only fetches NEW photos since last load
 - [x] Added persistent cache metadata using SharedPreferences
 - [x] Preserved in-memory asset cache across filter switches
-- [x] Optimized reset logic - soft reset keeps asset cache, full reset available when needed
+- [x] **Fixed video loading** - cache now properly invalidates when switching between photos and videos
+- [x] **Removed "Resume Last Session"** - redundant feature (Most Recent already skips reviewed photos)
 
 **How the optimization works:**
 - First launch: Full fetch of all photos (one-time)
 - Subsequent launches: Checks photo count, only fetches new photos (< 100 new = incremental load)
 - Filter switches: Reuses cached assets, just re-filters and re-sorts
-- No more waiting 10+ seconds when returning to app after taking photos
+- Videos: Separate cache tracking, properly switches between photo/video mode
 
 ### Session 2 - Feature Enhancements
 - [x] **Mark ALL swipes as reviewed** (both left and right)
@@ -83,7 +83,6 @@ PhotoSwipe is a Flutter mobile app that allows users to clean their photo galler
 
 ### P0 - Critical (In Progress)
 - [ ] **Fix UI Glitches on Swipe Screen** - Multiple overlapping progress counters/undo buttons
-- [ ] **Fix "Resume Last Session"** - Doesn't restore user's position correctly
 - [ ] Update tutorial/onboarding to explain:
   - "Most Recent" = only unreviewed photos
   - "All Photos" = start fresh (except deleted ones)

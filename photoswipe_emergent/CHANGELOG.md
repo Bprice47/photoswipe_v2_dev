@@ -4,7 +4,7 @@
 
 ---
 
-### v1.6 - Performance Optimization (December 2025)
+### v1.6 - Performance Optimization & Cleanup (December 2025)
 **Status: IN TESTING**
 
 **Fixed:**
@@ -12,16 +12,19 @@
 - [x] Implemented incremental photo loading - only fetches NEW photos since last load
 - [x] Added persistent cache metadata using SharedPreferences
 - [x] Preserved in-memory asset cache across filter switches
-- [x] Optimized reset logic - soft reset keeps asset cache, full reset available when needed
+- [x] **Fixed video loading** - cache now properly invalidates when switching between photos and videos
+- [x] **Removed "Resume Last Session"** - redundant feature (Most Recent already skips reviewed photos)
 
 **How it works:**
 - First launch: Full fetch of all photos (one-time)
 - Subsequent launches: Checks photo count, only fetches new photos (< 100 new = incremental load)
 - Filter switches: Reuses cached assets, just re-filters and re-sorts
+- Videos: Separate cache for video count, properly switches between photo/video mode
 
 **Technical changes:**
-- `photo_provider.dart`: Added `_assetsAreCached` flag and `_keyLastPhotoCount` persistent storage
-- `swipe_screen.dart`: Smart filter change detection - only resets when filter actually changes
+- `photo_provider.dart`: Added `_cachedFilterType` to track photo vs video cache
+- `constants.dart`: Removed `FilterType.resume` enum value
+- `category_screen.dart`: Removed Resume Last Session menu item
 
 ---
 

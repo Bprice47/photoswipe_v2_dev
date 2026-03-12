@@ -93,9 +93,6 @@ class AppConstants {
   static const String categoryDateRange = 'Custom Date Range';
   static const String categoryDateRangeDesc = 'Pick start and end dates';
 
-  static const String categoryResume = 'Resume Last Session';
-  static const String categoryResumeDesc = 'Continue with unreviewed photos';
-
   // ============== DUMPBOX SETTINGS ==============
 
   /// Maximum photos in dumpbox before requiring review
@@ -145,11 +142,10 @@ Note: Deleted photos are permanently removed and won\'t appear in either option.
 /// Filter types for photo loading
 enum FilterType {
   mostRecent,    // Skip reviewed photos, newest first
-  oldest,        // Skip reviewed photos, oldest first
-  videos,        // Skip reviewed videos, newest first
+  oldest,        // Show all photos, oldest first
+  videos,        // Videos only, newest first
   dateRange,     // Custom date range, oldest first (start date forward)
-  resume,        // Continue from where user left off
-  allPhotos,     // Show ALL photos (including reviewed) - ADDED AT END
+  allPhotos,     // Show ALL photos (including reviewed)
 }
 
 /// Sort order for photos

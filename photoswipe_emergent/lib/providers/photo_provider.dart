@@ -14,6 +14,7 @@ class PhotoProvider extends ChangeNotifier {
   bool _isLoadingMore = false; // For auto-load indicator
   String? _errorMessage;
   FilterType _currentFilter = FilterType.mostRecent;
+  FilterType? _cachedFilterType; // Track what filter type the cache is for
   DateTime? _startDate;
   DateTime? _endDate;
   int _totalCount = 0;
@@ -22,7 +23,7 @@ class PhotoProvider extends ChangeNotifier {
   
   // Cache keys for persistent optimization
   static const String _keyLastPhotoCount = 'last_photo_count';
-  static const String _keyLastFetchTime = 'last_fetch_time';
+  static const String _keyLastVideoCount = 'last_video_count';
   
   // In-memory cache flag
   bool _assetsAreCached = false;
@@ -107,12 +108,18 @@ class PhotoProvider extends ChangeNotifier {
         await _loadReviewedIds();
       }
 
+      // Determine if this is a videos-only filter
+      final bool isVideoFilter = _currentFilter == FilterType.videos;
+      
       // Get the appropriate request type
-      RequestType requestType = RequestType.image;
-      if (_currentFilter == FilterType.videos) {
-        requestType = RequestType.video;
-      } else {
-        requestType = RequestType.common; // Both images and videos
+      RequestType requestType = isVideoFilter ? RequestType.video : RequestType.common;
+
+      // IMPORTANT: Invalidate cache if switching between videos and photos
+      if (_cachedFilterType != null && 
+          ((_cachedFilterType == FilterType.videos) != isVideoFilter)) {
+        debugPrint('Cache invalidated: switching between photos and videos');
+        _allAssets = [];
+        _assetsAreCached = false;
       }
 
       // Get all albums
@@ -122,7 +129,7 @@ class PhotoProvider extends ChangeNotifier {
       );
 
       if (albums.isEmpty) {
-        _errorMessage = 'No photo albums found';
+        _errorMessage = isVideoFilter ? 'No videos found' : 'No photo albums found';
         _isLoading = false;
         notifyListeners();
         return;
@@ -132,32 +139,33 @@ class PhotoProvider extends ChangeNotifier {
       final AssetPathEntity recentAlbum = albums.first;
       final int currentCount = await recentAlbum.assetCountAsync;
       
-      debugPrint('Total photos in library: $currentCount');
+      debugPrint('Total ${isVideoFilter ? "videos" : "photos"} in library: $currentCount');
       
       // Check if we can use incremental loading
       final prefs = await SharedPreferences.getInstance();
-      final int lastKnownCount = prefs.getInt(_keyLastPhotoCount) ?? 0;
-      final int newPhotosCount = currentCount - lastKnownCount;
+      final String countKey = isVideoFilter ? _keyLastVideoCount : _keyLastPhotoCount;
+      final int lastKnownCount = prefs.getInt(countKey) ?? 0;
+      final int newItemsCount = currentCount - lastKnownCount;
       
-      debugPrint('Last known count: $lastKnownCount, New photos: $newPhotosCount');
+      debugPrint('Last known count: $lastKnownCount, New items: $newItemsCount');
 
       // OPTIMIZATION: Only fetch what's needed
-      if (_assetsAreCached && _allAssets.isNotEmpty && newPhotosCount >= 0 && newPhotosCount < 100) {
-        // Small number of new photos - just fetch those and merge
-        if (newPhotosCount > 0) {
-          debugPrint('Incremental load: Fetching $newPhotosCount new photos only');
+      if (_assetsAreCached && _allAssets.isNotEmpty && newItemsCount >= 0 && newItemsCount < 100) {
+        // Small number of new items - just fetch those and merge
+        if (newItemsCount > 0) {
+          debugPrint('Incremental load: Fetching $newItemsCount new items only');
           final newAssets = await recentAlbum.getAssetListRange(
             start: 0,
-            end: newPhotosCount,
+            end: newItemsCount,
           );
-          // Prepend new photos (they're the most recent)
+          // Prepend new items (they're the most recent)
           _allAssets = [...newAssets, ..._allAssets];
         } else {
-          debugPrint('Using cached ${_allAssets.length} asset references (no new photos)');
+          debugPrint('Using cached ${_allAssets.length} asset references (no new items)');
         }
       } else {
-        // Full fetch needed: first load, cache invalidated, or too many new photos
-        debugPrint('Full fetch: Loading all $currentCount photos');
+        // Full fetch needed: first load, cache invalidated, or too many new items
+        debugPrint('Full fetch: Loading all $currentCount items');
         _allAssets = await recentAlbum.getAssetListRange(
           start: 0,
           end: currentCount,
@@ -168,14 +176,15 @@ class PhotoProvider extends ChangeNotifier {
       // Update cache metadata
       _totalCount = currentCount;
       _assetsAreCached = true;
-      await prefs.setInt(_keyLastPhotoCount, currentCount);
+      _cachedFilterType = _currentFilter;
+      await prefs.setInt(countKey, currentCount);
 
       // Sort based on filter type FIRST
       // Custom date range sorts oldest first (start date forward)
       if (_currentFilter == FilterType.oldest || _currentFilter == FilterType.dateRange) {
         _allAssets.sort((a, b) => a.createDateTime.compareTo(b.createDateTime));
       } else {
-        // Most recent, allPhotos, videos, resume (default - newest first)
+        // Most recent, allPhotos, videos (default - newest first)
         _allAssets.sort((a, b) => b.createDateTime.compareTo(a.createDateTime));
       }
 
@@ -197,7 +206,7 @@ class PhotoProvider extends ChangeNotifier {
           continue;
         }
 
-        // Skip reviewed photos for mostRecent, oldest, videos, resume
+        // Skip reviewed photos for mostRecent and videos only
         if (skipReviewed && _reviewedPhotoIds.contains(asset.id)) {
           continue;
         }
@@ -414,6 +423,7 @@ class PhotoProvider extends ChangeNotifier {
     _isLoadingMore = false;
     _errorMessage = null;
     _assetsAreCached = false;
+    _cachedFilterType = null;
     notifyListeners();
   }
 
