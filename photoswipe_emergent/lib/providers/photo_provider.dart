@@ -193,8 +193,12 @@ class PhotoProvider extends ChangeNotifier {
         if (_startDate != null && asset.createDateTime.isBefore(_startDate!)) {
           continue;
         }
-        if (_endDate != null && asset.createDateTime.isAfter(_endDate!)) {
-          continue;
+        // For end date, include the entire day (set to 23:59:59)
+        if (_endDate != null) {
+          final endOfDay = DateTime(_endDate!.year, _endDate!.month, _endDate!.day, 23, 59, 59);
+          if (asset.createDateTime.isAfter(endOfDay)) {
+            continue;
+          }
         }
 
         // Skip reviewed photos for mostRecent and videos
