@@ -135,7 +135,6 @@ class PhotoProvider extends ChangeNotifier {
 
       // PAGINATED FETCH: Load photos in small batches until we have enough
       List<AssetEntity> validAssets = [];
-      int fetchStart = oldestFirst ? _totalCount - 1 : 0;
       int fetchBatchSize = 200; // Fetch 200 at a time to filter
       int totalFetched = 0;
       
@@ -143,9 +142,12 @@ class PhotoProvider extends ChangeNotifier {
         int start, end;
         
         if (oldestFirst) {
-          // For oldest first, we need to fetch from the end
-          end = _totalCount - totalFetched;
-          start = (end - fetchBatchSize).clamp(0, end);
+          // For oldest first, fetch from the END of the library
+          // Index 0 = newest, Index (totalCount-1) = oldest
+          // So we want to start from the highest indices
+          start = (_totalCount - totalFetched - fetchBatchSize).clamp(0, _totalCount);
+          end = (_totalCount - totalFetched).clamp(0, _totalCount);
+          if (start >= end) break;
         } else {
           // For newest first, fetch from the beginning
           start = totalFetched;
@@ -154,7 +156,7 @@ class PhotoProvider extends ChangeNotifier {
         
         if (start >= end) break;
         
-        debugPrint('Fetching batch: $start to $end');
+        debugPrint('Fetching batch: $start to $end (oldest first: $oldestFirst)');
         
         final batchAssets = await recentAlbum.getAssetListRange(
           start: start,
@@ -163,8 +165,12 @@ class PhotoProvider extends ChangeNotifier {
         
         totalFetched += batchAssets.length;
         
+        // For oldest first, we need to process in reverse order
+        // because getAssetListRange returns newest-first within the range
+        final assetsToProcess = oldestFirst ? batchAssets.reversed.toList() : batchAssets;
+        
         // Filter this batch
-        for (final asset in batchAssets) {
+        for (final asset in assetsToProcess) {
           // Apply date filters if set
           if (_startDate != null && asset.createDateTime.isBefore(_startDate!)) {
             continue;
@@ -187,13 +193,6 @@ class PhotoProvider extends ChangeNotifier {
         }
       }
       
-      // Sort the valid assets
-      if (oldestFirst) {
-        validAssets.sort((a, b) => a.createDateTime.compareTo(b.createDateTime));
-      } else {
-        validAssets.sort((a, b) => b.createDateTime.compareTo(a.createDateTime));
-      }
-
       debugPrint('Found ${validAssets.length} valid assets after filtering');
 
       // Store for later use
