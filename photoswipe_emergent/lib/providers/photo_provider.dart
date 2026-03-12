@@ -7,8 +7,8 @@ import '../config/constants.dart';
 /// Provider for managing the photo list and swipe state
 class PhotoProvider extends ChangeNotifier {
   List<PhotoModel> _photos = [];
-  List<AssetEntity> _allAssets = []; // Master cache of ALL photos
-  List<AssetEntity> _filteredAssets = []; // Filtered subset for current view
+  List<AssetEntity> _allAssets = [];
+  List<AssetEntity> _filteredAssets = []; // Store filtered assets for auto-load
   int _currentIndex = 0;
   bool _isLoading = false;
   bool _isLoadingMore = false; // For auto-load indicator
@@ -19,6 +19,13 @@ class PhotoProvider extends ChangeNotifier {
   int _totalCount = 0;
   int _currentBatchStart = 0; // Track which batch we're on
   Set<String> _reviewedPhotoIds = {};
+  
+  // Cache keys for persistent optimization
+  static const String _keyLastPhotoCount = 'last_photo_count';
+  static const String _keyLastFetchTime = 'last_fetch_time';
+  
+  // In-memory cache flag
+  bool _assetsAreCached = false;
 
   // Getters
   List<PhotoModel> get photos => _photos;
@@ -34,7 +41,8 @@ class PhotoProvider extends ChangeNotifier {
   PhotoModel? get currentPhoto =>
       _currentIndex < _photos.length ? _photos[_currentIndex] : null;
   bool get hasPhotos => _photos.isNotEmpty && _currentIndex < _photos.length;
-  bool get hasMoreToLoad => _currentBatchStart + AppConstants.maxPhotosToLoad < _totalCount;
+  bool get hasMoreToLoad => _currentBatchStart + AppConstants.maxPhotosToLoad < _filteredAssets.length;
+  bool get isCached => _assetsAreCached;
 
   /// Initialize - load reviewed photo IDs from storage
   Future<void> init() async {
@@ -85,13 +93,12 @@ class PhotoProvider extends ChangeNotifier {
   }
 
   /// Load photos from gallery using photo_manager
-  /// Strategy: Load ALL photos once, then only fetch new ones when returning to app
+  /// Optimized: Only fetches new photos since last load when possible
   Future<void> loadPhotos() async {
     _isLoading = true;
     _errorMessage = null;
     _photos = [];
     _currentIndex = 0;
-    _currentBatchStart = 0;
     notifyListeners();
 
     try {
@@ -100,11 +107,13 @@ class PhotoProvider extends ChangeNotifier {
         await _loadReviewedIds();
       }
 
-      // Determine if this is a videos-only filter
-      final bool isVideoFilter = _currentFilter == FilterType.videos;
-      
       // Get the appropriate request type
-      RequestType requestType = isVideoFilter ? RequestType.video : RequestType.common;
+      RequestType requestType = RequestType.image;
+      if (_currentFilter == FilterType.videos) {
+        requestType = RequestType.video;
+      } else {
+        requestType = RequestType.common; // Both images and videos
+      }
 
       // Get all albums
       final List<AssetPathEntity> albums = await PhotoManager.getAssetPathList(
@@ -113,7 +122,7 @@ class PhotoProvider extends ChangeNotifier {
       );
 
       if (albums.isEmpty) {
-        _errorMessage = isVideoFilter ? 'No videos found' : 'No photo albums found';
+        _errorMessage = 'No photo albums found';
         _isLoading = false;
         notifyListeners();
         return;
@@ -123,64 +132,63 @@ class PhotoProvider extends ChangeNotifier {
       final AssetPathEntity recentAlbum = albums.first;
       final int currentCount = await recentAlbum.assetCountAsync;
       
-      debugPrint('Total ${isVideoFilter ? "videos" : "photos"} in library: $currentCount');
+      debugPrint('Total photos in library: $currentCount');
+      
+      // Check if we can use incremental loading
+      final prefs = await SharedPreferences.getInstance();
+      final int lastKnownCount = prefs.getInt(_keyLastPhotoCount) ?? 0;
+      final int newPhotosCount = currentCount - lastKnownCount;
+      
+      debugPrint('Last known count: $lastKnownCount, New photos: $newPhotosCount');
 
-      // Check if we already have photos cached in memory
-      if (_allAssets.isNotEmpty) {
-        // We have cached photos - just check for new ones
-        final int newPhotosCount = currentCount - _allAssets.length;
-        
-        if (newPhotosCount > 0 && newPhotosCount <= 200) {
-          // Fetch only the new photos (they're at the beginning - most recent)
-          debugPrint('Incremental load: Fetching $newPhotosCount new photos');
+      // OPTIMIZATION: Only fetch what's needed
+      if (_assetsAreCached && _allAssets.isNotEmpty && newPhotosCount >= 0 && newPhotosCount < 100) {
+        // Small number of new photos - just fetch those and merge
+        if (newPhotosCount > 0) {
+          debugPrint('Incremental load: Fetching $newPhotosCount new photos only');
           final newAssets = await recentAlbum.getAssetListRange(
             start: 0,
             end: newPhotosCount,
           );
-          // Prepend new photos to our cache
+          // Prepend new photos (they're the most recent)
           _allAssets = [...newAssets, ..._allAssets];
-        } else if (newPhotosCount > 200 || newPhotosCount < 0) {
-          // Too many changes or photos deleted - do full reload
-          debugPrint('Full reload needed: $newPhotosCount changes detected');
-          _allAssets = await recentAlbum.getAssetListRange(
-            start: 0,
-            end: currentCount,
-          );
+        } else {
+          debugPrint('Using cached ${_allAssets.length} asset references (no new photos)');
         }
-        // else: no new photos, use existing cache
-        debugPrint('Using cached ${_allAssets.length} photos');
       } else {
-        // First load - fetch everything
-        debugPrint('Initial load: Fetching all $currentCount photos');
+        // Full fetch needed: first load, cache invalidated, or too many new photos
+        debugPrint('Full fetch: Loading all $currentCount photos');
         _allAssets = await recentAlbum.getAssetListRange(
           start: 0,
           end: currentCount,
         );
-        debugPrint('Loaded ${_allAssets.length} asset references');
+        debugPrint('Fetched ${_allAssets.length} asset references');
       }
       
-      _totalCount = _allAssets.length;
+      // Update cache metadata
+      _totalCount = currentCount;
+      _assetsAreCached = true;
+      await prefs.setInt(_keyLastPhotoCount, currentCount);
 
-      // Create a working copy for sorting/filtering (don't modify original cache)
-      List<AssetEntity> workingAssets = List.from(_allAssets);
-
-      // Sort based on filter type
+      // Sort based on filter type FIRST
+      // Custom date range sorts oldest first (start date forward)
       if (_currentFilter == FilterType.oldest || _currentFilter == FilterType.dateRange) {
-        workingAssets.sort((a, b) => a.createDateTime.compareTo(b.createDateTime));
+        _allAssets.sort((a, b) => a.createDateTime.compareTo(b.createDateTime));
       } else {
-        // Most recent, allPhotos, videos (default - newest first)
-        workingAssets.sort((a, b) => b.createDateTime.compareTo(a.createDateTime));
+        // Most recent, allPhotos, videos, resume (default - newest first)
+        _allAssets.sort((a, b) => b.createDateTime.compareTo(a.createDateTime));
       }
 
       // Determine if we should skip reviewed photos
-      final bool skipReviewed = _currentFilter != FilterType.allPhotos && 
-                                _currentFilter != FilterType.dateRange &&
-                                _currentFilter != FilterType.oldest;
+      // allPhotos, dateRange, and oldest show everything; others skip reviewed
+      bool skipReviewed = _currentFilter != FilterType.allPhotos && 
+                          _currentFilter != FilterType.dateRange &&
+                          _currentFilter != FilterType.oldest;
 
       // Filter assets based on criteria
       List<AssetEntity> filteredAssets = [];
 
-      for (final asset in workingAssets) {
+      for (final asset in _allAssets) {
         // Apply date filters if set
         if (_startDate != null && asset.createDateTime.isBefore(_startDate!)) {
           continue;
@@ -189,7 +197,7 @@ class PhotoProvider extends ChangeNotifier {
           continue;
         }
 
-        // Skip reviewed photos if needed
+        // Skip reviewed photos for mostRecent, oldest, videos, resume
         if (skipReviewed && _reviewedPhotoIds.contains(asset.id)) {
           continue;
         }
@@ -201,19 +209,14 @@ class PhotoProvider extends ChangeNotifier {
 
       // Store filtered assets for auto-load functionality
       _filteredAssets = filteredAssets;
+      _currentBatchStart = 0;
 
-      // Get current batch
+      // Get current batch (first 1000 or less)
       List<AssetEntity> currentBatch = filteredAssets.length > AppConstants.maxPhotosToLoad
           ? filteredAssets.sublist(0, AppConstants.maxPhotosToLoad)
           : filteredAssets;
 
-      debugPrint('Loading batch of ${currentBatch.length} photos');
-
-      if (currentBatch.isEmpty) {
-        _isLoading = false;
-        notifyListeners();
-        return;
-      }
+      debugPrint('Loading batch of ${currentBatch.length} photos (${filteredAssets.length} total available)');
 
       // Load thumbnails for first batch (for smooth UX)
       final int initialBatchSize = 10;
@@ -222,8 +225,8 @@ class PhotoProvider extends ChangeNotifier {
       for (int i = 0; i < currentBatch.length && i < initialBatchSize; i++) {
         final asset = currentBatch[i];
         final thumbnail = await asset.thumbnailDataWithSize(
-          const ThumbnailSize(400, 400),
-          quality: 70,
+          const ThumbnailSize(400, 400),  // Smaller = faster
+          quality: 70,  // Lower quality = faster
         );
 
         loadedPhotos.add(PhotoModel(
@@ -232,7 +235,8 @@ class PhotoProvider extends ChangeNotifier {
           modifyDate: asset.modifiedDateTime,
           width: asset.width,
           height: asset.height,
-          type: asset.type == AssetType.video ? PhotoType.video : PhotoType.image,
+          type:
+              asset.type == AssetType.video ? PhotoType.video : PhotoType.image,
           duration: asset.type == AssetType.video ? asset.duration : null,
           thumbnail: thumbnail,
         ));
@@ -388,7 +392,7 @@ class PhotoProvider extends ChangeNotifier {
     nextPhoto();
   }
 
-  /// Reset to beginning (keeps master cache for fast filter switching)
+  /// Reset to beginning (keeps asset cache for faster reload)
   void reset() {
     _currentIndex = 0;
     _photos = [];
@@ -396,19 +400,20 @@ class PhotoProvider extends ChangeNotifier {
     _currentBatchStart = 0;
     _isLoadingMore = false;
     _errorMessage = null;
-    // Note: _allAssets is preserved - this is the master cache
+    // Note: _allAssets and _assetsAreCached are preserved for performance
     notifyListeners();
   }
   
-  /// Full reset including master cache (use when forcing complete refresh)
+  /// Full reset including cache (use when switching albums or forcing refresh)
   void fullReset() {
     _currentIndex = 0;
     _photos = [];
     _filteredAssets = [];
-    _allAssets = []; // Clear master cache
+    _allAssets = [];
     _currentBatchStart = 0;
     _isLoadingMore = false;
     _errorMessage = null;
+    _assetsAreCached = false;
     notifyListeners();
   }
 
