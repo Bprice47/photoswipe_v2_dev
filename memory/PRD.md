@@ -81,11 +81,27 @@ PhotoSwipe is a Flutter mobile app that allows users to clean their photo galler
 
 ## Upcoming Tasks (P0/P1)
 
-### P0 - Critical (In Progress)
-- [ ] **Fix UI Glitches on Swipe Screen** - Multiple overlapping progress counters/undo buttons
-- [ ] Update tutorial/onboarding to explain:
-  - "Most Recent" = only unreviewed photos
-  - "All Photos" = start fresh (except deleted ones)
+### P0 - Critical (Next Session)
+1. **🔴 FIX LOAD PROBLEM** - Warm resume optimization not working
+   - Goal: When user takes photos and returns to app, only fetch NEW photos
+   - The other AI's suggestion: Check `_allAssets.isNotEmpty` for warm resume, compare count delta, prepend new photos
+   - Current issue: Something still broken after implementation attempt
+
+2. **🟠 Video Loading Issue** - Videos not loading properly in Videos filter
+
+3. **🟡 Dumpbox 25-Photo Rule**
+   - Cap dumpbox at 25 photos (not 30)
+   - When 26th photo is swiped left → show prompt to clean dumpbox
+   - **Subscribers**: Just the prompt, return to photos after cleaning
+   - **Non-subscribers**: Show ad, then return to photos
+
+4. **🟡 Remove Delete/Keep Buttons**
+   - Buttons are redundant after tutorial (swipe gestures work)
+   - Removal makes room for banner ad at bottom
+
+5. **🟢 Banner Ad Placeholder**
+   - Add banner ad space at bottom of swipe screen
+   - Only shows for non-subscribers
 
 ### P1 - Important
 - [ ] Implement actual ad integration (AdMob or similar)
