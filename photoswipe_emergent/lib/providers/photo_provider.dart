@@ -175,7 +175,7 @@ class PhotoProvider extends ChangeNotifier {
       if (_currentFilter == FilterType.oldest || _currentFilter == FilterType.dateRange) {
         _allAssets.sort((a, b) => a.createDateTime.compareTo(b.createDateTime));
       } else {
-        // Most recent, allPhotos, videos, resume (default - newest first)
+        // Most recent, allPhotos, videos (default - newest first)
         _allAssets.sort((a, b) => b.createDateTime.compareTo(a.createDateTime));
       }
 
@@ -197,7 +197,7 @@ class PhotoProvider extends ChangeNotifier {
           continue;
         }
 
-        // Skip reviewed photos for mostRecent, oldest, videos, resume
+        // Skip reviewed photos for mostRecent and videos
         if (skipReviewed && _reviewedPhotoIds.contains(asset.id)) {
           continue;
         }

@@ -80,8 +80,6 @@ class SessionModel {
         return AppConstants.categoryVideos;
       case FilterType.dateRange:
         return AppConstants.categoryDateRange;
-      case FilterType.resume:
-        return AppConstants.categoryResume;
     }
   }
 
