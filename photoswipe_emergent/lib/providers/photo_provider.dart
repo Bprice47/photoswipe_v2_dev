@@ -7,7 +7,7 @@ import '../config/constants.dart';
 /// Provider for managing the photo list and swipe state
 class PhotoProvider extends ChangeNotifier {
   List<PhotoModel> _photos = [];
-  List<AssetEntity> _allAssets = [];
+  List<AssetEntity> _allAssets = []; // Master cache - persists on warm resume
   List<AssetEntity> _filteredAssets = []; // Store filtered assets for auto-load
   int _currentIndex = 0;
   bool _isLoading = false;
@@ -19,13 +19,6 @@ class PhotoProvider extends ChangeNotifier {
   int _totalCount = 0;
   int _currentBatchStart = 0; // Track which batch we're on
   Set<String> _reviewedPhotoIds = {};
-  
-  // Cache keys for persistent optimization
-  static const String _keyLastPhotoCount = 'last_photo_count';
-  static const String _keyLastFetchTime = 'last_fetch_time';
-  
-  // In-memory cache flag
-  bool _assetsAreCached = false;
 
   // Getters
   List<PhotoModel> get photos => _photos;
@@ -42,7 +35,6 @@ class PhotoProvider extends ChangeNotifier {
       _currentIndex < _photos.length ? _photos[_currentIndex] : null;
   bool get hasPhotos => _photos.isNotEmpty && _currentIndex < _photos.length;
   bool get hasMoreToLoad => _currentBatchStart + AppConstants.maxPhotosToLoad < _filteredAssets.length;
-  bool get isCached => _assetsAreCached;
 
   /// Initialize - load reviewed photo IDs from storage
   Future<void> init() async {
@@ -93,7 +85,7 @@ class PhotoProvider extends ChangeNotifier {
   }
 
   /// Load photos from gallery using photo_manager
-  /// Optimized: Only fetches new photos since last load when possible
+  /// Optimized: On warm resume, only fetches NEW photos and prepends to cache
   Future<void> loadPhotos() async {
     _isLoading = true;
     _errorMessage = null;
@@ -133,31 +125,40 @@ class PhotoProvider extends ChangeNotifier {
       final int currentCount = await recentAlbum.assetCountAsync;
       
       debugPrint('Total photos in library: $currentCount');
-      
-      // Check if we can use incremental loading
-      final prefs = await SharedPreferences.getInstance();
-      final int lastKnownCount = prefs.getInt(_keyLastPhotoCount) ?? 0;
-      final int newPhotosCount = currentCount - lastKnownCount;
-      
-      debugPrint('Last known count: $lastKnownCount, New photos: $newPhotosCount');
 
-      // OPTIMIZATION: Only fetch what's needed
-      if (_assetsAreCached && _allAssets.isNotEmpty && newPhotosCount >= 0 && newPhotosCount < 100) {
-        // Small number of new photos - just fetch those and merge
-        if (newPhotosCount > 0) {
+      // WARM RESUME OPTIMIZATION:
+      // If we have cached assets in memory, only fetch new photos
+      if (_allAssets.isNotEmpty) {
+        final int lastKnownCount = _allAssets.length;
+        final int newPhotosCount = currentCount - lastKnownCount;
+        
+        debugPrint('Warm resume - Cached: $lastKnownCount, New: $newPhotosCount');
+
+        if (newPhotosCount > 0 && newPhotosCount < 200) {
+          // Fetch only the new photos (they're at index 0 - newest first)
           debugPrint('Incremental load: Fetching $newPhotosCount new photos only');
           final newAssets = await recentAlbum.getAssetListRange(
             start: 0,
             end: newPhotosCount,
           );
-          // Prepend new photos (they're the most recent)
+          // Prepend new photos to existing cache
           _allAssets = [...newAssets, ..._allAssets];
-        } else {
-          debugPrint('Using cached ${_allAssets.length} asset references (no new photos)');
+          debugPrint('Cache updated: ${_allAssets.length} total');
+        } else if (newPhotosCount < 0 || newPhotosCount >= 200) {
+          // User deleted photos OR too many new photos - full reload
+          debugPrint('Cache invalidated (delta: $newPhotosCount) - Full reload');
+          _allAssets = await recentAlbum.getAssetListRange(
+            start: 0,
+            end: currentCount,
+          );
+        }
+        // else: newPhotosCount == 0, no changes, use existing cache
+        else {
+          debugPrint('No changes - using cached ${_allAssets.length} assets');
         }
       } else {
-        // Full fetch needed: first load, cache invalidated, or too many new photos
-        debugPrint('Full fetch: Loading all $currentCount photos');
+        // COLD START: No cache, must do full load
+        debugPrint('Cold start: Loading all $currentCount photos');
         _allAssets = await recentAlbum.getAssetListRange(
           start: 0,
           end: currentCount,
@@ -165,12 +166,9 @@ class PhotoProvider extends ChangeNotifier {
         debugPrint('Fetched ${_allAssets.length} asset references');
       }
       
-      // Update cache metadata
-      _totalCount = currentCount;
-      _assetsAreCached = true;
-      await prefs.setInt(_keyLastPhotoCount, currentCount);
+      _totalCount = _allAssets.length;
 
-      // Sort based on filter type FIRST
+      // Sort based on filter type
       // Custom date range sorts oldest first (start date forward)
       if (_currentFilter == FilterType.oldest || _currentFilter == FilterType.dateRange) {
         _allAssets.sort((a, b) => a.createDateTime.compareTo(b.createDateTime));
