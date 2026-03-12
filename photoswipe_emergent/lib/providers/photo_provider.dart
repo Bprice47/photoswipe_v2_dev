@@ -391,6 +391,7 @@ class PhotoProvider extends ChangeNotifier {
   }
 
   /// Reset to beginning (keeps asset cache for faster reload)
+  /// Reset to beginning (keeps master cache for fast reload)
   void reset() {
     _currentIndex = 0;
     _photos = [];
@@ -398,11 +399,11 @@ class PhotoProvider extends ChangeNotifier {
     _currentBatchStart = 0;
     _isLoadingMore = false;
     _errorMessage = null;
-    // Note: _allAssets and _assetsAreCached are preserved for performance
+    // Note: _allAssets is preserved for warm resume optimization
     notifyListeners();
   }
   
-  /// Full reset including cache (use when switching albums or forcing refresh)
+  /// Full reset including cache (use when forcing complete refresh)
   void fullReset() {
     _currentIndex = 0;
     _photos = [];
@@ -411,7 +412,6 @@ class PhotoProvider extends ChangeNotifier {
     _currentBatchStart = 0;
     _isLoadingMore = false;
     _errorMessage = null;
-    _assetsAreCached = false;
     notifyListeners();
   }
 
