@@ -8,22 +8,20 @@
 **Status: IN TESTING**
 
 **Fixed:**
-- [x] **MAJOR PERFORMANCE FIX**: App now uses true pagination - only loads 200 photos at a time instead of all 10,000+
-- [x] **Removed "Resume Last Session"** - redundant feature (Most Recent already skips reviewed photos)
-- [x] Loading time should now be consistent regardless of library size
+- [x] **Performance optimization**: Load all photos once, then only fetch new ones when returning
+- [x] **Removed "Resume Last Session"** - redundant (Most Recent already skips reviewed photos)
 
 **How it works now:**
-- Instead of fetching ALL 10,000+ photo references upfront, we now:
-  1. Fetch photos in batches of 200
-  2. Filter each batch (skip reviewed, apply date filters)
-  3. Stop when we have enough photos (20 for testing, 1000 for production)
-- This means: 10,000 photos or 100 photos = same fast load time!
+- First open: Full load of all photos (with loading screen)
+- While app is open: All photos cached in memory, instant filter switching
+- Return to app after taking photos: Only fetches NEW photos (up to 200), merges with cache
+- Result: First load takes time, but subsequent usage is FAST!
 
 **Technical changes:**
-- `photo_provider.dart`: Complete rewrite of `loadPhotos()` with true pagination
-- `constants.dart`: Removed `FilterType.resume` enum value
+- `photo_provider.dart`: Smart caching - checks if photos already loaded, only fetches new ones
+- `constants.dart`: Removed `FilterType.resume`
 - `category_screen.dart`: Removed Resume Last Session menu item
-- `session_model.dart`: Removed resume case from switch statement
+- `session_model.dart`: Removed resume case
 
 ---
 

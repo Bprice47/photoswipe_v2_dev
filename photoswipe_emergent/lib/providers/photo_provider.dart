@@ -7,7 +7,8 @@ import '../config/constants.dart';
 /// Provider for managing the photo list and swipe state
 class PhotoProvider extends ChangeNotifier {
   List<PhotoModel> _photos = [];
-  List<AssetEntity> _filteredAssets = []; // Store filtered assets for auto-load
+  List<AssetEntity> _allAssets = []; // Master cache of ALL photos
+  List<AssetEntity> _filteredAssets = []; // Filtered subset for current view
   int _currentIndex = 0;
   bool _isLoading = false;
   bool _isLoadingMore = false; // For auto-load indicator
@@ -84,7 +85,7 @@ class PhotoProvider extends ChangeNotifier {
   }
 
   /// Load photos from gallery using photo_manager
-  /// PAGINATED: Only fetches what we need, not the entire library
+  /// Strategy: Load ALL photos once, then only fetch new ones when returning to app
   Future<void> loadPhotos() async {
     _isLoading = true;
     _errorMessage = null;
@@ -120,85 +121,95 @@ class PhotoProvider extends ChangeNotifier {
 
       // Get the "Recent" album (usually first, contains all)
       final AssetPathEntity recentAlbum = albums.first;
-      _totalCount = await recentAlbum.assetCountAsync;
+      final int currentCount = await recentAlbum.assetCountAsync;
       
-      debugPrint('Total ${isVideoFilter ? "videos" : "photos"} in library: $_totalCount');
+      debugPrint('Total ${isVideoFilter ? "videos" : "photos"} in library: $currentCount');
 
-      // Determine sort order based on filter
-      final bool oldestFirst = _currentFilter == FilterType.oldest || 
-                               _currentFilter == FilterType.dateRange;
+      // Check if we already have photos cached in memory
+      if (_allAssets.isNotEmpty) {
+        // We have cached photos - just check for new ones
+        final int newPhotosCount = currentCount - _allAssets.length;
+        
+        if (newPhotosCount > 0 && newPhotosCount <= 200) {
+          // Fetch only the new photos (they're at the beginning - most recent)
+          debugPrint('Incremental load: Fetching $newPhotosCount new photos');
+          final newAssets = await recentAlbum.getAssetListRange(
+            start: 0,
+            end: newPhotosCount,
+          );
+          // Prepend new photos to our cache
+          _allAssets = [...newAssets, ..._allAssets];
+        } else if (newPhotosCount > 200 || newPhotosCount < 0) {
+          // Too many changes or photos deleted - do full reload
+          debugPrint('Full reload needed: $newPhotosCount changes detected');
+          _allAssets = await recentAlbum.getAssetListRange(
+            start: 0,
+            end: currentCount,
+          );
+        }
+        // else: no new photos, use existing cache
+        debugPrint('Using cached ${_allAssets.length} photos');
+      } else {
+        // First load - fetch everything
+        debugPrint('Initial load: Fetching all $currentCount photos');
+        _allAssets = await recentAlbum.getAssetListRange(
+          start: 0,
+          end: currentCount,
+        );
+        debugPrint('Loaded ${_allAssets.length} asset references');
+      }
       
+      _totalCount = _allAssets.length;
+
+      // Create a working copy for sorting/filtering (don't modify original cache)
+      List<AssetEntity> workingAssets = List.from(_allAssets);
+
+      // Sort based on filter type
+      if (_currentFilter == FilterType.oldest || _currentFilter == FilterType.dateRange) {
+        workingAssets.sort((a, b) => a.createDateTime.compareTo(b.createDateTime));
+      } else {
+        // Most recent, allPhotos, videos (default - newest first)
+        workingAssets.sort((a, b) => b.createDateTime.compareTo(a.createDateTime));
+      }
+
       // Determine if we should skip reviewed photos
       final bool skipReviewed = _currentFilter != FilterType.allPhotos && 
                                 _currentFilter != FilterType.dateRange &&
                                 _currentFilter != FilterType.oldest;
 
-      // PAGINATED FETCH: Load photos in small batches until we have enough
-      List<AssetEntity> validAssets = [];
-      int fetchBatchSize = 200; // Fetch 200 at a time to filter
-      int totalFetched = 0;
-      
-      while (validAssets.length < AppConstants.maxPhotosToLoad && totalFetched < _totalCount) {
-        int start, end;
-        
-        if (oldestFirst) {
-          // For oldest first, fetch from the END of the library
-          // Index 0 = newest, Index (totalCount-1) = oldest
-          // So we want to start from the highest indices
-          start = (_totalCount - totalFetched - fetchBatchSize).clamp(0, _totalCount);
-          end = (_totalCount - totalFetched).clamp(0, _totalCount);
-          if (start >= end) break;
-        } else {
-          // For newest first, fetch from the beginning
-          start = totalFetched;
-          end = (start + fetchBatchSize).clamp(0, _totalCount);
-        }
-        
-        if (start >= end) break;
-        
-        debugPrint('Fetching batch: $start to $end (oldest first: $oldestFirst)');
-        
-        final batchAssets = await recentAlbum.getAssetListRange(
-          start: start,
-          end: end,
-        );
-        
-        totalFetched += batchAssets.length;
-        
-        // For oldest first, we need to process in reverse order
-        // because getAssetListRange returns newest-first within the range
-        final assetsToProcess = oldestFirst ? batchAssets.reversed.toList() : batchAssets;
-        
-        // Filter this batch
-        for (final asset in assetsToProcess) {
-          // Apply date filters if set
-          if (_startDate != null && asset.createDateTime.isBefore(_startDate!)) {
-            continue;
-          }
-          if (_endDate != null && asset.createDateTime.isAfter(_endDate!)) {
-            continue;
-          }
+      // Filter assets based on criteria
+      List<AssetEntity> filteredAssets = [];
 
-          // Skip reviewed photos if needed
-          if (skipReviewed && _reviewedPhotoIds.contains(asset.id)) {
-            continue;
-          }
-
-          validAssets.add(asset);
-          
-          // Stop if we have enough
-          if (validAssets.length >= AppConstants.maxPhotosToLoad) {
-            break;
-          }
+      for (final asset in workingAssets) {
+        // Apply date filters if set
+        if (_startDate != null && asset.createDateTime.isBefore(_startDate!)) {
+          continue;
         }
+        if (_endDate != null && asset.createDateTime.isAfter(_endDate!)) {
+          continue;
+        }
+
+        // Skip reviewed photos if needed
+        if (skipReviewed && _reviewedPhotoIds.contains(asset.id)) {
+          continue;
+        }
+
+        filteredAssets.add(asset);
       }
-      
-      debugPrint('Found ${validAssets.length} valid assets after filtering');
 
-      // Store for later use
-      _filteredAssets = validAssets;
+      debugPrint('Filtered to ${filteredAssets.length} assets');
 
-      if (validAssets.isEmpty) {
+      // Store filtered assets for auto-load functionality
+      _filteredAssets = filteredAssets;
+
+      // Get current batch
+      List<AssetEntity> currentBatch = filteredAssets.length > AppConstants.maxPhotosToLoad
+          ? filteredAssets.sublist(0, AppConstants.maxPhotosToLoad)
+          : filteredAssets;
+
+      debugPrint('Loading batch of ${currentBatch.length} photos');
+
+      if (currentBatch.isEmpty) {
         _isLoading = false;
         notifyListeners();
         return;
@@ -208,8 +219,8 @@ class PhotoProvider extends ChangeNotifier {
       final int initialBatchSize = 10;
       List<PhotoModel> loadedPhotos = [];
 
-      for (int i = 0; i < validAssets.length && i < initialBatchSize; i++) {
-        final asset = validAssets[i];
+      for (int i = 0; i < currentBatch.length && i < initialBatchSize; i++) {
+        final asset = currentBatch[i];
         final thumbnail = await asset.thumbnailDataWithSize(
           const ThumbnailSize(400, 400),
           quality: 70,
@@ -234,7 +245,7 @@ class PhotoProvider extends ChangeNotifier {
       debugPrint('Initial batch loaded: ${_photos.length} photos');
 
       // Load remaining thumbnails in background
-      _loadRemainingPhotos(validAssets, initialBatchSize);
+      _loadRemainingPhotos(currentBatch, initialBatchSize);
     } catch (e) {
       _errorMessage = e.toString();
       _isLoading = false;
@@ -377,7 +388,7 @@ class PhotoProvider extends ChangeNotifier {
     nextPhoto();
   }
 
-  /// Reset to beginning
+  /// Reset to beginning (keeps master cache for fast filter switching)
   void reset() {
     _currentIndex = 0;
     _photos = [];
@@ -385,12 +396,20 @@ class PhotoProvider extends ChangeNotifier {
     _currentBatchStart = 0;
     _isLoadingMore = false;
     _errorMessage = null;
+    // Note: _allAssets is preserved - this is the master cache
     notifyListeners();
   }
   
-  /// Full reset (same as reset since we no longer cache all assets)
+  /// Full reset including master cache (use when forcing complete refresh)
   void fullReset() {
-    reset();
+    _currentIndex = 0;
+    _photos = [];
+    _filteredAssets = [];
+    _allAssets = []; // Clear master cache
+    _currentBatchStart = 0;
+    _isLoadingMore = false;
+    _errorMessage = null;
+    notifyListeners();
   }
 
   /// Clear all reviewed IDs (for testing/reset)
