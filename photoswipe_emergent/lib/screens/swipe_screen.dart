@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
@@ -21,14 +20,12 @@ class SwipeScreen extends StatefulWidget {
 }
 
 class _SwipeScreenState extends State<SwipeScreen> {
-  late CardSwiperController _swiperController;
+  final CardSwiperController _swiperController = CardSwiperController();
   bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    debugPrint('SwipeScreen initState: ${identityHashCode(this)}');
-    _swiperController = CardSwiperController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializePhotos();
     });
@@ -36,7 +33,6 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
   @override
   void dispose() {
-    debugPrint('SwipeScreen dispose: ${identityHashCode(this)}');
     _swiperController.dispose();
     super.dispose();
   }
@@ -46,9 +42,6 @@ class _SwipeScreenState extends State<SwipeScreen> {
     _isInitialized = true;
 
     final photoProvider = Provider.of<PhotoProvider>(context, listen: false);
-
-    // Always reset photos list and index when entering screen
-    photoProvider.reset();
 
     // Initialize provider (load reviewed IDs)
     await photoProvider.init();
@@ -60,6 +53,10 @@ class _SwipeScreenState extends State<SwipeScreen> {
       final endDate = widget.filterOptions!['endDate'] as DateTime?;
 
       if (filterType != null) {
+        // Only reset if filter changed
+        if (photoProvider.currentFilter != filterType) {
+          photoProvider.reset(); // Soft reset - keeps asset cache
+        }
         photoProvider.setFilter(
           type: filterType,
           startDate: startDate,

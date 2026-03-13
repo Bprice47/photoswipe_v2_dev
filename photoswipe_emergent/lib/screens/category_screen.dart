@@ -127,7 +127,7 @@ class CategoryScreen extends StatelessWidget {
 
   /// Navigate to swipe screen with filter options
   void _navigateToSwipe(BuildContext context, FilterType filterType) {
-    AppRoutes.navigateReplace(
+    AppRoutes.navigateTo(
       context,
       AppRoutes.swipe,
       arguments: {
