@@ -123,6 +123,8 @@ class PhotoProvider extends ChangeNotifier {
       final AssetPathEntity recentAlbum = albums.first;
       _totalCount = await recentAlbum.assetCountAsync;
 
+      debugPrint('=== PHOTO LOADING DEBUG ===');
+      debugPrint('Album name: ${recentAlbum.name}');
       debugPrint('Total photos in library: $_totalCount');
 
       // Fetch ALL photo references (fast - no thumbnails yet)
@@ -132,6 +134,13 @@ class PhotoProvider extends ChangeNotifier {
       );
 
       debugPrint('Fetched ${_allAssets.length} asset references');
+      
+      // Log the dates of first few photos to verify we're getting recent ones
+      if (_allAssets.isNotEmpty) {
+        debugPrint('First photo date: ${_allAssets.first.createDateTime}');
+        debugPrint('Last photo date: ${_allAssets.last.createDateTime}');
+      }
+      debugPrint('=== END DEBUG ===');
 
       // Sort based on filter type FIRST
       // Custom date range sorts oldest first (start date forward)
