@@ -19,13 +19,6 @@ class PhotoProvider extends ChangeNotifier {
   int _totalCount = 0;
   int _currentBatchStart = 0; // Track which batch we're on
   Set<String> _reviewedPhotoIds = {};
-  
-  // Cache keys for persistent optimization
-  static const String _keyLastPhotoCount = 'last_photo_count';
-  static const String _keyLastFetchTime = 'last_fetch_time';
-  
-  // In-memory cache flag
-  bool _assetsAreCached = false;
 
   // Getters
   List<PhotoModel> get photos => _photos;
@@ -42,7 +35,6 @@ class PhotoProvider extends ChangeNotifier {
       _currentIndex < _photos.length ? _photos[_currentIndex] : null;
   bool get hasPhotos => _photos.isNotEmpty && _currentIndex < _photos.length;
   bool get hasMoreToLoad => _currentBatchStart + AppConstants.maxPhotosToLoad < _filteredAssets.length;
-  bool get isCached => _assetsAreCached;
 
   /// Initialize - load reviewed photo IDs from storage
   Future<void> init() async {
@@ -93,7 +85,6 @@ class PhotoProvider extends ChangeNotifier {
   }
 
   /// Load photos from gallery using photo_manager
-  /// Optimized: Only fetches new photos since last load when possible
   Future<void> loadPhotos() async {
     _isLoading = true;
     _errorMessage = null;
@@ -130,45 +121,17 @@ class PhotoProvider extends ChangeNotifier {
 
       // Get the "Recent" album (usually first, contains all)
       final AssetPathEntity recentAlbum = albums.first;
-      final int currentCount = await recentAlbum.assetCountAsync;
-      
-      debugPrint('Total photos in library: $currentCount');
-      
-      // Check if we can use incremental loading
-      final prefs = await SharedPreferences.getInstance();
-      final int lastKnownCount = prefs.getInt(_keyLastPhotoCount) ?? 0;
-      final int newPhotosCount = currentCount - lastKnownCount;
-      
-      debugPrint('Last known count: $lastKnownCount, New photos: $newPhotosCount');
+      _totalCount = await recentAlbum.assetCountAsync;
 
-      // OPTIMIZATION: Only fetch what's needed
-      if (_assetsAreCached && _allAssets.isNotEmpty && newPhotosCount >= 0 && newPhotosCount < 100) {
-        // Small number of new photos - just fetch those and merge
-        if (newPhotosCount > 0) {
-          debugPrint('Incremental load: Fetching $newPhotosCount new photos only');
-          final newAssets = await recentAlbum.getAssetListRange(
-            start: 0,
-            end: newPhotosCount,
-          );
-          // Prepend new photos (they're the most recent)
-          _allAssets = [...newAssets, ..._allAssets];
-        } else {
-          debugPrint('Using cached ${_allAssets.length} asset references (no new photos)');
-        }
-      } else {
-        // Full fetch needed: first load, cache invalidated, or too many new photos
-        debugPrint('Full fetch: Loading all $currentCount photos');
-        _allAssets = await recentAlbum.getAssetListRange(
-          start: 0,
-          end: currentCount,
-        );
-        debugPrint('Fetched ${_allAssets.length} asset references');
-      }
-      
-      // Update cache metadata
-      _totalCount = currentCount;
-      _assetsAreCached = true;
-      await prefs.setInt(_keyLastPhotoCount, currentCount);
+      debugPrint('Total photos in library: $_totalCount');
+
+      // Fetch ALL photo references (fast - no thumbnails yet)
+      _allAssets = await recentAlbum.getAssetListRange(
+        start: 0,
+        end: _totalCount,
+      );
+
+      debugPrint('Fetched ${_allAssets.length} asset references');
 
       // Sort based on filter type FIRST
       // Custom date range sorts oldest first (start date forward)
@@ -225,8 +188,8 @@ class PhotoProvider extends ChangeNotifier {
       for (int i = 0; i < currentBatch.length && i < initialBatchSize; i++) {
         final asset = currentBatch[i];
         final thumbnail = await asset.thumbnailDataWithSize(
-          const ThumbnailSize(400, 400),  // Smaller = faster
-          quality: 70,  // Lower quality = faster
+          const ThumbnailSize(800, 800),
+          quality: 85,
         );
 
         loadedPhotos.add(PhotoModel(
@@ -266,8 +229,8 @@ class PhotoProvider extends ChangeNotifier {
 
       try {
         final thumbnail = await asset.thumbnailDataWithSize(
-          const ThumbnailSize(400, 400),  // Smaller = faster
-          quality: 70,  // Lower quality = faster
+          const ThumbnailSize(800, 800),
+          quality: 85,
         );
 
         _photos.add(PhotoModel(
@@ -282,9 +245,10 @@ class PhotoProvider extends ChangeNotifier {
           thumbnail: thumbnail,
         ));
 
-        // Update UI every 5 photos (faster feedback)
-        if (i % 5 == 0) {
+        // Update UI every 20 photos
+        if (i % 20 == 0) {
           notifyListeners();
+          debugPrint('Loaded ${_photos.length} photos...');
         }
       } catch (e) {
         debugPrint('Error loading photo $i: $e');
@@ -334,8 +298,8 @@ class PhotoProvider extends ChangeNotifier {
         
         try {
           final thumbnail = await asset.thumbnailDataWithSize(
-            const ThumbnailSize(400, 400),  // Smaller = faster
-            quality: 70,  // Lower quality = faster
+            const ThumbnailSize(800, 800),
+            quality: 85,
           );
           
           _photos.add(PhotoModel(
@@ -349,8 +313,8 @@ class PhotoProvider extends ChangeNotifier {
             thumbnail: thumbnail,
           ));
           
-          // Update UI every 5 photos (faster feedback)
-          if (i % 5 == 0) {
+          // Update UI every 20 photos
+          if (i % 20 == 0) {
             notifyListeners();
           }
         } catch (e) {
@@ -392,7 +356,7 @@ class PhotoProvider extends ChangeNotifier {
     nextPhoto();
   }
 
-  /// Reset to beginning (keeps asset cache for faster reload)
+  /// Reset to beginning
   void reset() {
     _currentIndex = 0;
     _photos = [];
@@ -400,20 +364,6 @@ class PhotoProvider extends ChangeNotifier {
     _currentBatchStart = 0;
     _isLoadingMore = false;
     _errorMessage = null;
-    // Note: _allAssets and _assetsAreCached are preserved for performance
-    notifyListeners();
-  }
-  
-  /// Full reset including cache (use when switching albums or forcing refresh)
-  void fullReset() {
-    _currentIndex = 0;
-    _photos = [];
-    _filteredAssets = [];
-    _allAssets = [];
-    _currentBatchStart = 0;
-    _isLoadingMore = false;
-    _errorMessage = null;
-    _assetsAreCached = false;
     notifyListeners();
   }
 
