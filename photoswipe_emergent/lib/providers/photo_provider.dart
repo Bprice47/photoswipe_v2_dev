@@ -1,11 +1,13 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/photo_model.dart';
 import '../config/constants.dart';
 
 /// Provider for managing the photo list and swipe state
-class PhotoProvider extends ChangeNotifier {
+/// Uses WidgetsBindingObserver to detect app resume and optimize photo loading
+class PhotoProvider extends ChangeNotifier with WidgetsBindingObserver {
   List<PhotoModel> _photos = [];
   List<AssetEntity> _allAssets = []; // Master cache - persists on warm resume
   List<AssetEntity> _filteredAssets = []; // Store filtered assets for auto-load
@@ -19,6 +21,7 @@ class PhotoProvider extends ChangeNotifier {
   int _totalCount = 0;
   int _currentBatchStart = 0; // Track which batch we're on
   Set<String> _reviewedPhotoIds = {};
+  AssetPathEntity? _cachedAlbum; // Cache the album reference
 
   // Getters
   List<PhotoModel> get photos => _photos;
@@ -35,6 +38,75 @@ class PhotoProvider extends ChangeNotifier {
       _currentIndex < _photos.length ? _photos[_currentIndex] : null;
   bool get hasPhotos => _photos.isNotEmpty && _currentIndex < _photos.length;
   bool get hasMoreToLoad => _currentBatchStart + AppConstants.maxPhotosToLoad < _filteredAssets.length;
+
+  /// Constructor - register lifecycle observer
+  PhotoProvider() {
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// Cleanup - remove lifecycle observer
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Called when app lifecycle changes (background/foreground)
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      debugPrint('App resumed - checking for new photos');
+      _checkForNewPhotos();
+    }
+  }
+
+  /// Check for new photos on warm resume (doesn't reload thumbnails, just updates cache)
+  Future<void> _checkForNewPhotos() async {
+    // Only do this if we have cached assets (warm resume)
+    if (_allAssets.isEmpty || _cachedAlbum == null) {
+      debugPrint('No cache - skipping warm resume check');
+      return;
+    }
+
+    try {
+      // Get current count from OS
+      final int currentCount = await _cachedAlbum!.assetCountAsync;
+      final int cachedCount = _allAssets.length;
+      
+      debugPrint('Warm resume check - OS: $currentCount, Cached: $cachedCount');
+
+      // Quick check: if count is same, compare first photo ID
+      if (currentCount == cachedCount) {
+        final latestFromOS = await _cachedAlbum!.getAssetListRange(start: 0, end: 1);
+        if (latestFromOS.isNotEmpty && _allAssets.isNotEmpty) {
+          if (latestFromOS.first.id == _allAssets.first.id) {
+            debugPrint('No changes detected - cache is current');
+            return;
+          }
+        }
+      }
+
+      // Something changed - figure out what
+      final int delta = currentCount - cachedCount;
+      
+      if (delta > 0 && delta < 200) {
+        // New photos added - fetch just those
+        debugPrint('Fetching $delta new photos');
+        final newAssets = await _cachedAlbum!.getAssetListRange(start: 0, end: delta);
+        _allAssets = [...newAssets, ..._allAssets];
+        _totalCount = _allAssets.length;
+        debugPrint('Cache updated: ${_allAssets.length} total');
+        // Note: We don't reload thumbnails here - that happens when user navigates to swipe screen
+      } else if (delta != 0) {
+        // Major change (deletions or lots of new photos) - mark cache as stale
+        // The next loadPhotos() call will do a full refresh
+        debugPrint('Major change detected (delta: $delta) - cache will refresh on next load');
+        _allAssets = []; // Clear cache to force full reload
+      }
+    } catch (e) {
+      debugPrint('Error checking for new photos: $e');
+    }
+  }
 
   /// Initialize - load reviewed photo IDs from storage
   Future<void> init() async {
@@ -85,7 +157,7 @@ class PhotoProvider extends ChangeNotifier {
   }
 
   /// Load photos from gallery using photo_manager
-  /// Optimized: On warm resume, only fetches NEW photos and prepends to cache
+  /// Optimized: Uses cached assets when available, only fetches new photos on warm resume
   Future<void> loadPhotos() async {
     _isLoading = true;
     _errorMessage = null;
@@ -120,49 +192,46 @@ class PhotoProvider extends ChangeNotifier {
         return;
       }
 
-      // Get the "Recent" album (usually first, contains all)
+      // Get the "Recent" album (usually first, contains all) and cache it
       final AssetPathEntity recentAlbum = albums.first;
+      _cachedAlbum = recentAlbum; // Cache for warm resume checks
       final int currentCount = await recentAlbum.assetCountAsync;
       
       debugPrint('Total photos in library: $currentCount');
 
       // WARM RESUME OPTIMIZATION:
-      // If we have cached assets in memory, only fetch new photos
+      // If we have cached assets, check if we can reuse them
       if (_allAssets.isNotEmpty) {
-        final int lastKnownCount = _allAssets.length;
-        final int newPhotosCount = currentCount - lastKnownCount;
+        // Compare first photo ID to detect changes
+        final latestFromOS = await recentAlbum.getAssetListRange(start: 0, end: 1);
+        final bool cacheIsValid = latestFromOS.isNotEmpty && 
+                                   _allAssets.isNotEmpty && 
+                                   latestFromOS.first.id == _allAssets.first.id &&
+                                   currentCount == _allAssets.length;
         
-        debugPrint('Warm resume - Cached: $lastKnownCount, New: $newPhotosCount');
-
-        if (newPhotosCount > 0 && newPhotosCount < 200) {
-          // Fetch only the new photos (they're at index 0 - newest first)
-          debugPrint('Incremental load: Fetching $newPhotosCount new photos only');
-          final newAssets = await recentAlbum.getAssetListRange(
-            start: 0,
-            end: newPhotosCount,
-          );
-          // Prepend new photos to existing cache
-          _allAssets = [...newAssets, ..._allAssets];
-          debugPrint('Cache updated: ${_allAssets.length} total');
-        } else if (newPhotosCount < 0 || newPhotosCount >= 200) {
-          // User deleted photos OR too many new photos - full reload
-          debugPrint('Cache invalidated (delta: $newPhotosCount) - Full reload');
-          _allAssets = await recentAlbum.getAssetListRange(
-            start: 0,
-            end: currentCount,
-          );
-        }
-        // else: newPhotosCount == 0, no changes, use existing cache
-        else {
-          debugPrint('No changes - using cached ${_allAssets.length} assets');
+        if (cacheIsValid) {
+          debugPrint('Cache is valid - using ${_allAssets.length} cached assets');
+        } else {
+          // Something changed - check what
+          final int delta = currentCount - _allAssets.length;
+          
+          if (delta > 0 && delta < 200) {
+            // New photos added - fetch just those and prepend
+            debugPrint('Incremental load: Fetching $delta new photos');
+            final newAssets = await recentAlbum.getAssetListRange(start: 0, end: delta);
+            _allAssets = [...newAssets, ..._allAssets];
+            debugPrint('Cache updated: ${_allAssets.length} total');
+          } else {
+            // Major change (deletions, lots of new photos, or ID mismatch) - full reload
+            debugPrint('Cache invalidated - Full reload (delta: $delta)');
+            _allAssets = await recentAlbum.getAssetListRange(start: 0, end: currentCount);
+            debugPrint('Fetched ${_allAssets.length} asset references');
+          }
         }
       } else {
         // COLD START: No cache, must do full load
         debugPrint('Cold start: Loading all $currentCount photos');
-        _allAssets = await recentAlbum.getAssetListRange(
-          start: 0,
-          end: currentCount,
-        );
+        _allAssets = await recentAlbum.getAssetListRange(start: 0, end: currentCount);
         debugPrint('Fetched ${_allAssets.length} asset references');
       }
       

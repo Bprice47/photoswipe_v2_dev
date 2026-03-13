@@ -8,20 +8,25 @@
 **Status: IN TESTING**
 
 **Fixed:**
-- [x] **Performance optimization**: Load all photos once, then only fetch new ones when returning
-- [x] **Removed "Resume Last Session"** - redundant (Most Recent already skips reviewed photos)
+- [x] **Warm resume optimization using WidgetsBindingObserver**
+- [x] App now listens for `AppLifecycleState.resumed` to detect when returning from background
+- [x] **ID comparison instead of count** - compares first photo ID to detect changes reliably
+- [x] Handles edge case: user deletes 5 photos + takes 5 new = count same but photos different
+- [x] **Removed "Resume Last Session"** - redundant (Most Recent already skips reviewed)
 
 **How it works now:**
-- First open: Full load of all photos (with loading screen)
-- While app is open: All photos cached in memory, instant filter switching
-- Return to app after taking photos: Only fetches NEW photos (up to 200), merges with cache
-- Result: First load takes time, but subsequent usage is FAST!
+- `PhotoProvider` extends `WidgetsBindingObserver` to detect app resume
+- On warm resume: compares newest photo ID in cache vs OS
+- If same: use cache (instant!)
+- If different: fetch only new photos and prepend (fast!)
+- If major change (deletions/200+): full reload
 
 **Technical changes:**
-- `photo_provider.dart`: Smart caching - checks if photos already loaded, only fetches new ones
-- `constants.dart`: Removed `FilterType.resume`
-- `category_screen.dart`: Removed Resume Last Session menu item
-- `session_model.dart`: Removed resume case
+- `photo_provider.dart`: Added `WidgetsBindingObserver` mixin
+- Added `didChangeAppLifecycleState()` to detect resume
+- Added `_checkForNewPhotos()` for background update check
+- Cached `AssetPathEntity` reference for quick resume checks
+- ID comparison for reliable change detection
 
 ---
 
