@@ -22,6 +22,7 @@ class SwipeScreen extends StatefulWidget {
 class _SwipeScreenState extends State<SwipeScreen> {
   final CardSwiperController _swiperController = CardSwiperController();
   bool _isInitialized = false;
+  Key _swiperKey = UniqueKey(); // Force CardSwiper rebuild on filter change
 
   @override
   void initState() {
@@ -56,6 +57,10 @@ class _SwipeScreenState extends State<SwipeScreen> {
         // Only reset if filter changed
         if (photoProvider.currentFilter != filterType) {
           photoProvider.reset(); // Soft reset - keeps asset cache
+          // Force CardSwiper to rebuild with new key
+          setState(() {
+            _swiperKey = UniqueKey();
+          });
         }
         photoProvider.setFilter(
           type: filterType,
@@ -270,6 +275,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
     // Card Swiper
     return CardSwiper(
+      key: _swiperKey, // Force rebuild when filter changes
       controller: _swiperController,
       cardsCount: photoProvider.photos.length,
       numberOfCardsDisplayed: 2,
