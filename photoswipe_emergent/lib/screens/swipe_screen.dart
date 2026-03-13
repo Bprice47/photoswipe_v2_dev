@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
@@ -26,6 +27,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
   @override
   void initState() {
     super.initState();
+    debugPrint('SwipeScreen initState: ${identityHashCode(this)}');
     _swiperController = CardSwiperController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializePhotos();
@@ -34,6 +36,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
   @override
   void dispose() {
+    debugPrint('SwipeScreen dispose: ${identityHashCode(this)}');
     _swiperController.dispose();
     super.dispose();
   }

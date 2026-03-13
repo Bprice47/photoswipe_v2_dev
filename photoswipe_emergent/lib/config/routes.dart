@@ -98,10 +98,16 @@ class AppRoutes {
     );
   }
 
-  /// Navigate to a route (replacing current)
+  /// Navigate to a route (pushing on stack)
   static void navigateTo(BuildContext context, String routeName,
       {Object? arguments}) {
     Navigator.pushNamed(context, routeName, arguments: arguments);
+  }
+
+  /// Navigate to a route (replacing current - use for SwipeScreen)
+  static void navigateReplace(BuildContext context, String routeName,
+      {Object? arguments}) {
+    Navigator.pushReplacementNamed(context, routeName, arguments: arguments);
   }
 
   /// Navigate and remove all previous routes

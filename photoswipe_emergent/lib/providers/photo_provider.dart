@@ -1,27 +1,28 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/services.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/photo_model.dart';
 import '../config/constants.dart';
 
 /// Provider for managing the photo list and swipe state
-/// Uses WidgetsBindingObserver to detect app resume and optimize photo loading
-class PhotoProvider extends ChangeNotifier with WidgetsBindingObserver {
+/// Uses PhotoManager.addChangeCallback for reliable gallery change detection
+class PhotoProvider extends ChangeNotifier {
   List<PhotoModel> _photos = [];
-  List<AssetEntity> _allAssets = []; // Master cache - persists on warm resume
-  List<AssetEntity> _filteredAssets = []; // Store filtered assets for auto-load
+  List<AssetEntity> _allAssets = []; // Master cache
+  List<AssetEntity> _filteredAssets = []; // Filtered subset for current view
   int _currentIndex = 0;
   bool _isLoading = false;
-  bool _isLoadingMore = false; // For auto-load indicator
+  bool _isLoadingMore = false;
   String? _errorMessage;
   FilterType _currentFilter = FilterType.mostRecent;
   DateTime? _startDate;
   DateTime? _endDate;
   int _totalCount = 0;
-  int _currentBatchStart = 0; // Track which batch we're on
+  int _currentBatchStart = 0;
   Set<String> _reviewedPhotoIds = {};
-  AssetPathEntity? _cachedAlbum; // Cache the album reference
+  AssetPathEntity? _cachedAlbum;
+  bool _isRefreshing = false;
 
   // Getters
   List<PhotoModel> get photos => _photos;
@@ -32,96 +33,40 @@ class PhotoProvider extends ChangeNotifier with WidgetsBindingObserver {
   FilterType get currentFilter => _currentFilter;
   int get remainingCount => _photos.length - _currentIndex;
   int get totalCount => _totalCount;
-  int get totalFilteredCount => _filteredAssets.length; // Total available after filtering
+  int get totalFilteredCount => _filteredAssets.length;
   Set<String> get reviewedPhotoIds => _reviewedPhotoIds;
   PhotoModel? get currentPhoto =>
       _currentIndex < _photos.length ? _photos[_currentIndex] : null;
   bool get hasPhotos => _photos.isNotEmpty && _currentIndex < _photos.length;
   bool get hasMoreToLoad => _currentBatchStart + AppConstants.maxPhotosToLoad < _filteredAssets.length;
 
-  /// Constructor - register lifecycle observer
+  /// Constructor - register for gallery change notifications
   PhotoProvider() {
-    WidgetsBinding.instance.addObserver(this);
+    _setupGalleryChangeListener();
   }
 
-  /// Cleanup - remove lifecycle observer
+  /// Setup listener for gallery changes (photos added/deleted)
+  void _setupGalleryChangeListener() {
+    PhotoManager.addChangeCallback(_onGalleryChanged);
+    PhotoManager.startChangeNotify();
+    debugPrint('Gallery change listener registered');
+  }
+
+  /// Called when photos are added/deleted from device gallery
+  void _onGalleryChanged(MethodCall call) {
+    debugPrint('Gallery changed: ${call.method}');
+    // Clear cache so next loadPhotos() does a fresh fetch
+    _allAssets = [];
+    _cachedAlbum = null;
+  }
+
+  /// Cleanup
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
+    PhotoManager.removeChangeCallback(_onGalleryChanged);
+    PhotoManager.stopChangeNotify();
+    debugPrint('Gallery change listener removed');
     super.dispose();
-  }
-
-  /// Called when app lifecycle changes (background/foreground)
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      debugPrint('App resumed - checking for new photos');
-      _checkForNewPhotos();
-    }
-  }
-
-  /// Check for new photos on warm resume (doesn't reload thumbnails, just updates cache)
-  Future<void> _checkForNewPhotos() async {
-    // Only do this if we have cached assets (warm resume)
-    if (_allAssets.isEmpty) {
-      debugPrint('No cache - skipping warm resume check');
-      return;
-    }
-
-    try {
-      // Get fresh album reference (don't rely on cached one)
-      final List<AssetPathEntity> albums = await PhotoManager.getAssetPathList(
-        type: RequestType.common,
-        hasAll: true,
-      );
-      
-      if (albums.isEmpty) {
-        debugPrint('No albums found on resume');
-        return;
-      }
-      
-      final recentAlbum = albums.first;
-      final int currentCount = await recentAlbum.assetCountAsync;
-      final int cachedCount = _allAssets.length;
-      
-      debugPrint('Warm resume check - OS: $currentCount, Cached: $cachedCount');
-
-      // Quick check: compare first photo ID
-      final latestFromOS = await recentAlbum.getAssetListRange(start: 0, end: 1);
-      if (latestFromOS.isEmpty) {
-        debugPrint('No photos in library');
-        return;
-      }
-      
-      // If newest photo ID matches and count is same, cache is current
-      if (currentCount == cachedCount && 
-          _allAssets.isNotEmpty && 
-          latestFromOS.first.id == _allAssets.first.id) {
-        debugPrint('No changes detected - cache is current');
-        return;
-      }
-
-      // Something changed - figure out what
-      final int delta = currentCount - cachedCount;
-      
-      if (delta > 0 && delta < 200) {
-        // New photos added - fetch just those
-        debugPrint('Fetching $delta new photos');
-        final newAssets = await recentAlbum.getAssetListRange(start: 0, end: delta);
-        _allAssets = [...newAssets, ..._allAssets];
-        _totalCount = _allAssets.length;
-        debugPrint('Cache updated: ${_allAssets.length} total');
-        notifyListeners(); // Notify UI that cache updated
-      } else {
-        // Major change (deletions or lots of new photos, or ID mismatch) - clear cache
-        debugPrint('Major change detected (delta: $delta) - clearing cache for full reload');
-        _allAssets = [];
-        _cachedAlbum = null;
-        notifyListeners();
-      }
-    } catch (e) {
-      debugPrint('Error checking for new photos: $e');
-    }
   }
 
   /// Initialize - load reviewed photo IDs from storage
