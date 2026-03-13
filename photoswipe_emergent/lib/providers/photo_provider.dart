@@ -63,27 +63,42 @@ class PhotoProvider extends ChangeNotifier with WidgetsBindingObserver {
   /// Check for new photos on warm resume (doesn't reload thumbnails, just updates cache)
   Future<void> _checkForNewPhotos() async {
     // Only do this if we have cached assets (warm resume)
-    if (_allAssets.isEmpty || _cachedAlbum == null) {
+    if (_allAssets.isEmpty) {
       debugPrint('No cache - skipping warm resume check');
       return;
     }
 
     try {
-      // Get current count from OS
-      final int currentCount = await _cachedAlbum!.assetCountAsync;
+      // Get fresh album reference (don't rely on cached one)
+      final List<AssetPathEntity> albums = await PhotoManager.getAssetPathList(
+        type: RequestType.common,
+        hasAll: true,
+      );
+      
+      if (albums.isEmpty) {
+        debugPrint('No albums found on resume');
+        return;
+      }
+      
+      final recentAlbum = albums.first;
+      final int currentCount = await recentAlbum.assetCountAsync;
       final int cachedCount = _allAssets.length;
       
       debugPrint('Warm resume check - OS: $currentCount, Cached: $cachedCount');
 
-      // Quick check: if count is same, compare first photo ID
-      if (currentCount == cachedCount) {
-        final latestFromOS = await _cachedAlbum!.getAssetListRange(start: 0, end: 1);
-        if (latestFromOS.isNotEmpty && _allAssets.isNotEmpty) {
-          if (latestFromOS.first.id == _allAssets.first.id) {
-            debugPrint('No changes detected - cache is current');
-            return;
-          }
-        }
+      // Quick check: compare first photo ID
+      final latestFromOS = await recentAlbum.getAssetListRange(start: 0, end: 1);
+      if (latestFromOS.isEmpty) {
+        debugPrint('No photos in library');
+        return;
+      }
+      
+      // If newest photo ID matches and count is same, cache is current
+      if (currentCount == cachedCount && 
+          _allAssets.isNotEmpty && 
+          latestFromOS.first.id == _allAssets.first.id) {
+        debugPrint('No changes detected - cache is current');
+        return;
       }
 
       // Something changed - figure out what
@@ -92,16 +107,17 @@ class PhotoProvider extends ChangeNotifier with WidgetsBindingObserver {
       if (delta > 0 && delta < 200) {
         // New photos added - fetch just those
         debugPrint('Fetching $delta new photos');
-        final newAssets = await _cachedAlbum!.getAssetListRange(start: 0, end: delta);
+        final newAssets = await recentAlbum.getAssetListRange(start: 0, end: delta);
         _allAssets = [...newAssets, ..._allAssets];
         _totalCount = _allAssets.length;
         debugPrint('Cache updated: ${_allAssets.length} total');
-        // Note: We don't reload thumbnails here - that happens when user navigates to swipe screen
-      } else if (delta != 0) {
-        // Major change (deletions or lots of new photos) - mark cache as stale
-        // The next loadPhotos() call will do a full refresh
-        debugPrint('Major change detected (delta: $delta) - cache will refresh on next load');
-        _allAssets = []; // Clear cache to force full reload
+        notifyListeners(); // Notify UI that cache updated
+      } else {
+        // Major change (deletions or lots of new photos, or ID mismatch) - clear cache
+        debugPrint('Major change detected (delta: $delta) - clearing cache for full reload');
+        _allAssets = [];
+        _cachedAlbum = null;
+        notifyListeners();
       }
     } catch (e) {
       debugPrint('Error checking for new photos: $e');

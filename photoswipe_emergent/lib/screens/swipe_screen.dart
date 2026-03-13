@@ -20,13 +20,13 @@ class SwipeScreen extends StatefulWidget {
 }
 
 class _SwipeScreenState extends State<SwipeScreen> {
-  final CardSwiperController _swiperController = CardSwiperController();
+  late CardSwiperController _swiperController;
   bool _isInitialized = false;
-  Key _swiperKey = UniqueKey(); // Force CardSwiper rebuild on filter change
 
   @override
   void initState() {
     super.initState();
+    _swiperController = CardSwiperController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializePhotos();
     });
@@ -44,6 +44,9 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
     final photoProvider = Provider.of<PhotoProvider>(context, listen: false);
 
+    // Always reset photos list and index when entering screen
+    photoProvider.reset();
+
     // Initialize provider (load reviewed IDs)
     await photoProvider.init();
 
@@ -54,14 +57,6 @@ class _SwipeScreenState extends State<SwipeScreen> {
       final endDate = widget.filterOptions!['endDate'] as DateTime?;
 
       if (filterType != null) {
-        // Only reset if filter changed
-        if (photoProvider.currentFilter != filterType) {
-          photoProvider.reset(); // Soft reset - keeps asset cache
-          // Force CardSwiper to rebuild with new key
-          setState(() {
-            _swiperKey = UniqueKey();
-          });
-        }
         photoProvider.setFilter(
           type: filterType,
           startDate: startDate,
@@ -275,7 +270,6 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
     // Card Swiper
     return CardSwiper(
-      key: _swiperKey, // Force rebuild when filter changes
       controller: _swiperController,
       cardsCount: photoProvider.photos.length,
       numberOfCardsDisplayed: 2,
